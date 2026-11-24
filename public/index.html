@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>CLINOVA Prospecção</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">C</span> CLINOVA <span class="brand-sub">Prospecção</span></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="contatos" role="tab">Contatos</button>
+      <button class="tab" data-tab="google" role="tab">Buscar no Google</button>
+      <button class="tab" data-tab="receita" role="tab">Receita Federal</button>
+      <button class="tab" data-tab="mensagens" role="tab">Mensagens</button>
+    </nav>
+    <button class="btn btn-ghost btn-sm" id="btn-logout">Sair</button>
+  </header>
+
+  <main class="container">
+    <!-- ================= CONTATOS ================= -->
+    <section class="panel active" id="tab-contatos">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="filters">
+        <input type="search" id="f-q" placeholder="Buscar nome, bairro, telefone ou CNPJ">
+        <select id="f-segment"><option value="">Todos os segmentos</option></select>
+        <select id="f-city"><option value="">Todas as cidades</option></select>
+        <select id="f-status"></select>
+        <select id="f-source">
+          <option value="">Google e Receita</option>
+          <option value="google">Só Google</option>
+          <option value="receita">Só Receita</option>
+        </select>
+        <label class="check"><input type="checkbox" id="f-mobile"> Só celular</label>
+        <a class="btn btn-ghost btn-sm" id="btn-csv" href="/api/leads.csv">Exportar planilha</a>
+      </div>
+
+      <p class="hint" id="daily-hint"></p>
+
+      <div class="list" id="lead-list"></div>
+      <div class="pager" id="pager"></div>
+    </section>
+
+    <!-- ================= GOOGLE ================= -->
+    <section class="panel" id="tab-google">
+      <div class="card">
+        <h2>Buscar empresas no Google Maps</h2>
+        <p class="muted">Usa a API oficial do Google. Cada busca traz no máximo 60 empresas, por isso ela é feita bairro por bairro. Buscas já feitas nos últimos 30 dias não são repetidas (você não paga duas vezes).</p>
+        <div class="notice" id="google-off" hidden>
+          A busca no Google está desligada: falta a variável <code>GOOGLE_PLACES_API_KEY</code> no servidor. Veja o passo a passo no README.
+        </div>
+        <h3>Segmentos</h3>
+        <div class="chips" id="g-segments"></div>
+        <h3>Bairros e cidades <small class="muted">(um por linha)</small></h3>
+        <textarea id="g-areas" rows="8"></textarea>
+        <div class="row">
+          <label>Máximo de consultas nesta rodada
+            <input type="number" id="g-max" value="40" min="1" max="200">
+          </label>
+          <p class="muted small">Cada consulta traz até 20 empresas e conta na sua cota do Google. Clique de novo para continuar de onde parou.</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btn-google">Buscar</button>
+          <button class="btn btn-ghost" id="btn-save-areas">Salvar bairros como padrão</button>
+        </div>
+        <div class="result" id="g-result" hidden></div>
+      </div>
+    </section>
+
+    <!-- ================= RECEITA ================= -->
+    <section class="panel" id="tab-receita">
+      <div class="card">
+        <h2>Importar da Receita Federal (CNPJ)</h2>
+        <p class="muted">Lê os dados abertos oficiais de CNPJ e guarda só as empresas <strong>ativas</strong> das cidades e atividades escolhidas. Os arquivos somam vários GB: a importação pode levar de 30 minutos a algumas horas e roda em segundo plano. Os telefones da Receita às vezes são do contador ou estão desatualizados; os contatos repetidos com o Google são juntados automaticamente.</p>
+        <div class="row">
+          <label>UF <input type="text" id="r-uf" maxlength="2" value="MG"></label>
+          <label class="check"><input type="checkbox" id="r-names" checked> Buscar a razão social de quem não tem nome fantasia (mais lento)</label>
+        </div>
+        <h3>Cidades <small class="muted">(um por linha, como na Receita: sem acentos não tem problema)</small></h3>
+        <textarea id="r-cities" rows="6"></textarea>
+        <h3>Segmentos</h3>
+        <div class="chips" id="r-segments"></div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btn-receita">Iniciar importação</button>
+          <button class="btn btn-ghost" id="btn-receita-cancel" hidden>Cancelar</button>
+        </div>
+        <div class="result" id="r-status" hidden></div>
+      </div>
+    </section>
+
+    <!-- ================= MENSAGENS ================= -->
+    <section class="panel" id="tab-mensagens">
+      <div class="card">
+        <h2>Mensagens do WhatsApp</h2>
+        <p class="muted">O botão "WhatsApp" de cada contato abre a conversa com a mensagem do segmento já escrita; você só confere e envia. Variáveis: <code>{seunome}</code> e <code>{nome}</code> (nome da empresa).</p>
+        <div class="row">
+          <label>Seu nome <input type="text" id="m-sender" maxlength="60" placeholder="Ex.: Gabriel"></label>
+          <label>Limite de mensagens por dia <input type="number" id="m-limit" min="1" max="200"></label>
+        </div>
+        <p class="muted small">Recomendado: até 25 mensagens novas por dia. Muitas mensagens iguais para quem não tem seu número salvo podem fazer o WhatsApp bloquear seu número.</p>
+        <div id="m-templates"></div>
+        <div class="actions"><button class="btn btn-primary" id="btn-save-msgs">Salvar mensagens</button></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Notas do contato -->
+  <dialog id="notes-dialog">
+    <form method="dialog" class="dialog-body">
+      <h3 id="notes-title">Notas</h3>
+      <textarea id="notes-text" rows="6" maxlength="2000" placeholder="Ex.: falei com a Ana da recepção; pediu para ligar depois das 14h."></textarea>
+      <div class="actions">
+        <button class="btn btn-ghost" value="cancel">Cancelar</button>
+        <button class="btn btn-primary" id="notes-save" value="save">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
