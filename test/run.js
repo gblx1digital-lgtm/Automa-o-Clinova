@@ -73,10 +73,17 @@ function est({ basico, ordem = '0001', dv = '10', fantasia = '', sit = '02', cna
   return [basico, ordem, dv, '1', fantasia, sit, '20200101', '00', '', '', '20200101', cnae, '', 'RUA', 'DA BAHIA', '100', 'SALA 2',
     bairro, '30160011', uf, mun, ddd1, tel1, ddd2, tel2, '', '', email, '', ''];
 }
+// Estrutura igual à do compartilhamento da Receita: pastas aninhadas e uma pasta por mês.
+// 2025-11 ainda está sendo publicado (sem arquivos): deve usar 2025-10.
+const SHARE = '/public.php/dav/files/TOKENTESTE/';
+const CNPJ_DIR = path.join(RF_DIR, 'Dados', 'Cadastros', 'CNPJ');
 function buildReceita() {
-  const month = path.join(RF_DIR, 'dados', '2025-10');
+  const month = path.join(CNPJ_DIR, '2025-10');
   fs.mkdirSync(month, { recursive: true });
-  fs.mkdirSync(path.join(RF_DIR, 'dados', '2025-09'), { recursive: true });
+  fs.mkdirSync(path.join(CNPJ_DIR, '2025-09'), { recursive: true });
+  fs.mkdirSync(path.join(CNPJ_DIR, '2025-11'), { recursive: true });
+  fs.mkdirSync(path.join(RF_DIR, 'Dados', 'Outros'), { recursive: true });
+  fs.writeFileSync(path.join(CNPJ_DIR, '2025-11', 'LEIAME.txt'), 'em publicação');
   makeZip(path.join(month, 'Municipios.zip'), 'MUNICCSV', [['4123', 'BELO HORIZONTE'], ['4305', 'CONTAGEM'], ['7107', 'SAO PAULO'], ['9999', 'SANTA LUZIA']]);
   makeZip(path.join(month, 'Estabelecimentos0.zip'), 'ESTABELE0', [
     est({ basico: '11111111', fantasia: 'ODONTO SAVASSI', cnae: '8630504', mun: '4123', tel1: '908000000', email: 'CONTATO@ODONTO.COM.BR' }), // = Google d0 (merge)
@@ -91,14 +98,27 @@ function buildReceita() {
   makeZip(path.join(month, 'Empresas0.zip'), 'EMPRECSV0', [['44444444', 'MARIA SOUZA 12345678901', '2135', '50', '0,00', '01', '']]);
   makeZip(path.join(month, 'Empresas1.zip'), 'EMPRECSV1', [['66666666', 'ANGELA LIMA', '2135', '50', '0,00', '01', '']]);
 }
+let rfPropfinds = 0;
 const rfServer = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
-  if (url === '/dados/' || url === '/dados') {
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    return res.end('<html><body><a href="2025-09/">2025-09/</a> <a href="2025-10/">2025-10/</a></body></html>');
-  }
-  const file = path.join(RF_DIR, url);
+  if (!url.startsWith(SHARE)) { res.writeHead(404); return res.end(); }
+  const rel = url.slice(SHARE.length);
+  const file = path.join(RF_DIR, rel);
   if (!file.startsWith(RF_DIR) || !fs.existsSync(file)) { res.writeHead(404); return res.end(); }
+  if (req.method === 'PROPFIND') {
+    rfPropfinds++;
+    if (rfPropfinds === 1) { res.writeHead(200); return res.end(); } // o servidor real às vezes responde vazio
+    if (!fs.statSync(file).isDirectory()) { res.writeHead(207); return res.end('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"></d:multistatus>'); }
+    const self = SHARE + (rel ? rel.replace(/\/?$/, '/') : '');
+    const items = [`<d:response><d:href>${encodeURI(self)}</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>`];
+    for (const name of fs.readdirSync(file)) {
+      const dir = fs.statSync(path.join(file, name)).isDirectory();
+      items.push(`<d:response><d:href>${encodeURI(self + name + (dir ? '/' : ''))}</d:href><d:propstat><d:prop><d:resourcetype>${dir ? '<d:collection/>' : ''}</d:resourcetype></d:prop></d:propstat></d:response>`);
+    }
+    res.writeHead(207, { 'Content-Type': 'application/xml; charset=utf-8' });
+    return res.end(`<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">${items.join('')}</d:multistatus>`);
+  }
+  if (fs.statSync(file).isDirectory()) { res.writeHead(405); return res.end(); }
   res.writeHead(200, { 'Content-Type': 'application/zip' });
   fs.createReadStream(file).pipe(res);
 });
@@ -126,7 +146,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     cwd: ROOT,
     env: { ...process.env, PORT: String(PORT_APP), DATA_DIR: path.join(TMP, 'data'), ADMIN_PASSWORD: PASSWORD,
       GOOGLE_PLACES_API_KEY: 'chave-teste', PLACES_API_URL: `http://localhost:${PORT_PLACES}/v1/places:searchText`,
-      RECEITA_BASE_URL: `http://localhost:${PORT_RF}/dados/`, RECEITA_PARTES: '2', NODE_ENV: 'test' },
+      RECEITA_SHARE_URL: `http://localhost:${PORT_RF}${SHARE}`, NODE_ENV: 'test' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let appLog = ''; app.stdout.on('data', d => { appLog += d; }); app.stderr.on('data', d => { appLog += d; });
@@ -188,7 +208,8 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     let st;
     for (let i = 0; i < 100; i++) { st = (await call('GET', '/api/receita/status')).json; if (!st.running) break; await sleep(100); }
     check('Receita: concluída sem erro', st.step === 'Concluído' && !st.error, JSON.stringify(st));
-    check('Receita: usa o mês mais recente', st.month === '2025-10', st.month);
+    check('Receita: acha a pasta do mês no compartilhamento (WebDAV) e pula o mês incompleto', st.month === '2025-10' && st.filesTotal === 5, `${st.month} ${st.filesTotal}`);
+    check('Receita: tenta de novo quando o servidor responde vazio', rfPropfinds > 3, rfPropfinds);
     check('Receita: só ativas, da UF, cidades e atividades certas (3 de 6)', st.matched === 3, JSON.stringify(st));
     check('Receita: 2 novos + 1 juntado com o Google', st.added === 2 && st.merged === 1, JSON.stringify(st));
     r = await call('GET', '/api/leads?pageSize=200&q=');
