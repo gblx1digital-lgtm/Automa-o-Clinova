@@ -9,6 +9,7 @@ const storage = require('./storage');
 const leads = require('./leads');
 const { BY_ID } = require('./segments');
 const cities = require('./cities');
+const intel = require('./intel');
 
 const PLACES_URL = () => (process.env.PLACES_API_URL || 'https://places.googleapis.com/v1/places:searchText').trim();
 const FIELD_MASK = [
@@ -67,7 +68,7 @@ function log() { return storage.read('google-log', {}); }
  * Roda as buscas (termo do segmento × área) até o limite de chamadas.
  * Pode ser chamada de novo para continuar de onde parou.
  */
-async function run({ segments = [], areas = [], maxCalls = 40, redo = false, minPopulation = 20000 }) {
+async function run({ segments = [], areas = [], maxCalls = 40, redo = false, minPopulation = 20000, onlyWithoutSite = true }) {
   if (!isConfigured()) throw Object.assign(new Error('Defina GOOGLE_PLACES_API_KEY nas variáveis do servidor.'), { status: 400 });
   const segs = segments.filter(s => BY_ID[s]);
   // Uma linha só com o estado ("MG", "Minas Gerais") vira a lista das cidades do estado
@@ -85,7 +86,7 @@ async function run({ segments = [], areas = [], maxCalls = 40, redo = false, min
     pending.push({ seg, q });
   }
 
-  const result = { calls: 0, queriesDone: 0, queriesLeft: 0, added: 0, merged: 0, skipped: 0, closed: 0, errors: [] };
+  const result = { calls: 0, queriesDone: 0, queriesLeft: 0, added: 0, merged: 0, skipped: 0, closed: 0, withSite: 0, errors: [] };
   return storage.withLock('leads', async () => {
     const index = leads.buildIndex();
     for (let i = 0; i < pending.length; i++) {
@@ -99,7 +100,11 @@ async function run({ segments = [], areas = [], maxCalls = 40, redo = false, min
           for (const place of page.places) {
             found++;
             if (place.businessStatus && place.businessStatus !== 'OPERATIONAL') { result.closed++; continue; }
-            result[leads.upsert(toLead(place, seg), index)]++;
+            const lead = toLead(place, seg);
+            // Quem tem site próprio ou já usa plataforma de agendamento tem pouca chance de comprar:
+            // não entra como contato novo (mas completa os dados de um contato que já existe)
+            if (onlyWithoutSite && !leads.exists(lead, index) && !intel.hasNoOwnSite(lead)) { result.withSite++; continue; }
+            result[leads.upsert(lead, index)]++;
           }
           token = page.nextPageToken;
         } while (token && result.calls < maxCalls);

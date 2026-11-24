@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const storage = require('./storage');
 const { BY_ID } = require('./segments');
+const intel = require('./intel');
 
 const STATUSES = {
   novo: 'Novo',
@@ -112,6 +113,15 @@ function upsert(input, index) {
   return 'added';
 }
 
+/** true se o contato já existe (mesmo placeId, CNPJ ou telefone). */
+function exists(input, index) {
+  const keys = [
+    input.placeId && `p:${input.placeId}`, input.cnpj && `c:${input.cnpj}`,
+    normalizePhone(input.phone) && `t:${normalizePhone(input.phone)}`, normalizePhone(input.phone2) && `t:${normalizePhone(input.phone2)}`
+  ].filter(Boolean);
+  return keys.some(k => index.has(k));
+}
+
 /** Índice de duplicados (placeId, CNPJ, telefones) — montado uma vez por busca/importação. */
 function buildIndex() {
   const index = new Map();
@@ -126,6 +136,14 @@ function buildIndex() {
 
 function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
 
+/** Filtro por presença na internet. "sem" = sem site próprio (nenhum ou só rede social). */
+function siteMatches(lead, wanted) {
+  const kind = intel.classifySite(lead).kind;
+  if (wanted === 'sem') return kind === 'nenhum' || kind === 'social';
+  if (wanted === 'sem_ou_desconhecido') return kind === 'nenhum' || kind === 'social' || kind === 'desconhecido';
+  return kind === wanted;
+}
+
 function filter(q = {}) {
   const text = norm(q.q).trim();
   const digits = String(q.q || '').replace(/\D/g, '');
@@ -135,22 +153,27 @@ function filter(q = {}) {
     (!q.city || norm(l.city) === norm(q.city)) &&
     (!q.source || (l.sources || []).includes(q.source)) &&
     (!q.mobile || l.mobile) &&
+    (!q.site || siteMatches(l, q.site)) &&
+    (!q.priority || intel.score(l).level === q.priority) &&
     (!text || norm(l.name).includes(text) || norm(l.bairro).includes(text) || norm(l.notes).includes(text) ||
       (digits.length >= 4 && (String(l.phone).includes(digits) || String(l.cnpj).includes(digits))))
   );
 }
 
 function query(q = {}) {
-  const items = filter(q);
-  // Fila de trabalho: celulares novos primeiro, depois os mais bem avaliados no Google
+  // Fila de trabalho: novos primeiro, depois a maior nota de prioridade (sem site, celular, ativo no Google)
+  const items = filter(q).map(l => ({ lead: l, intel: intel.score(l) }));
   items.sort((a, b) =>
-    (a.status === 'novo' ? 0 : 1) - (b.status === 'novo' ? 0 : 1) ||
-    (b.mobile ? 1 : 0) - (a.mobile ? 1 : 0) ||
-    (b.ratingCount || 0) - (a.ratingCount || 0) ||
-    a.name.localeCompare(b.name));
+    (a.lead.status === 'novo' ? 0 : 1) - (b.lead.status === 'novo' ? 0 : 1) ||
+    b.intel.score - a.intel.score ||
+    (b.lead.ratingCount || 0) - (a.lead.ratingCount || 0) ||
+    a.lead.name.localeCompare(b.lead.name));
   const pageSize = Math.min(Math.max(Number(q.pageSize) || 50, 10), 200);
   const page = Math.max(Number(q.page) || 1, 1);
-  return { total: items.length, page, pageSize, items: items.slice((page - 1) * pageSize, page * pageSize) };
+  return {
+    total: items.length, page, pageSize,
+    items: items.slice((page - 1) * pageSize, page * pageSize).map(({ lead, intel: i }) => ({ ...lead, intel: i }))
+  };
 }
 
 function todayBR() {
@@ -163,15 +186,20 @@ function stats() {
   const bySegment = {};
   const cities = new Set();
   let mobile = 0, contactedToday = 0;
+  const bySite = { nenhum: 0, social: 0, proprio: 0, agendamento: 0, desconhecido: 0 };
+  const byPriority = { alta: 0, media: 0, baixa: 0 };
   const today = todayBR();
   for (const l of list) {
+    const i = intel.score(l);
+    bySite[i.site.kind]++;
+    if (l.status === 'novo') byPriority[i.level]++;
     byStatus[l.status] = (byStatus[l.status] || 0) + 1;
     bySegment[l.segment] = (bySegment[l.segment] || 0) + 1;
     if (l.city) cities.add(l.city);
     if (l.mobile) mobile++;
     if (l.contactedAt && new Date(new Date(l.contactedAt).getTime() - 3 * 3600000).toISOString().slice(0, 10) === today) contactedToday++;
   }
-  return { total: list.length, mobile, contactedToday, byStatus, bySegment, cities: [...cities].sort() };
+  return { total: list.length, mobile, contactedToday, byStatus, bySegment, bySite, byPriority, noSite: bySite.nenhum + bySite.social, cities: [...cities].sort() };
 }
 
 function find(id) { return all().find(l => l.id === id) || null; }
@@ -210,9 +238,11 @@ function csvCell(v) {
 }
 
 function toCsv(q = {}) {
-  const head = ['Nome', 'Segmento', 'Telefone', 'Celular', 'Telefone 2', 'E-mail', 'Bairro', 'Cidade', 'UF', 'Endereço',
+  const head = ['Prioridade', 'Nota', 'Site', 'Motivos', 'Nome', 'Segmento', 'Telefone', 'Celular', 'Telefone 2', 'E-mail', 'Bairro', 'Cidade', 'UF', 'Endereço',
     'Site', 'Nota Google', 'Avaliações', 'CNPJ', 'Fontes', 'Status', 'Mensagem enviada em', 'Notas', 'Google Maps'];
-  const rows = filter(q).map(l => [
+  const LEVEL = { alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+  const rows = filter(q).map(l => ({ l, i: intel.score(l) })).sort((a, b) => b.i.score - a.i.score).map(({ l, i }) => [
+    LEVEL[i.level], i.score, i.site.label, i.reasons.join(' · '),
     l.name, BY_ID[l.segment]?.label || l.segment, formatPhone(l.phone), l.mobile ? 'sim' : 'não', formatPhone(l.phone2),
     l.email, l.bairro, l.city, l.uf, l.address, l.website, l.rating || '', l.ratingCount || '', l.cnpj,
     (l.sources || []).join(' + '), STATUSES[l.status] || l.status, l.contactedAt ? new Date(l.contactedAt).toLocaleString('pt-BR') : '',
@@ -222,6 +252,6 @@ function toCsv(q = {}) {
 }
 
 module.exports = {
-  STATUSES, DO_NOT_CONTACT, all, upsert, buildIndex, query, stats, find, update, markContacted, toCsv,
+  STATUSES, DO_NOT_CONTACT, all, upsert, exists, buildIndex, query, stats, find, update, markContacted, toCsv,
   normalizePhone, isMobile, formatPhone, titleCase
 };

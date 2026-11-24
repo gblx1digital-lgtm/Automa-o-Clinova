@@ -47,7 +47,8 @@ $('btn-logout').addEventListener('click', async () => { await api('/api/logout',
 function filters() {
   return {
     q: $('f-q').value.trim(), segment: $('f-segment').value, city: $('f-city').value,
-    status: $('f-status').value, source: $('f-source').value, mobile: $('f-mobile').checked ? '1' : ''
+    status: $('f-status').value, source: $('f-source').value, mobile: $('f-mobile').checked ? '1' : '',
+    site: $('f-site').value, priority: $('f-priority').value
   };
 }
 
@@ -71,8 +72,8 @@ function renderKpis(s) {
   const over = s.contactedToday >= limit;
   $('kpis').innerHTML = [
     ['Contatos', s.total],
-    ['Com celular', s.mobile],
-    ['Ainda não abordados', queue],
+    ['Sem site próprio', s.noSite, 'good'],
+    ['Prioridade alta (novos)', s.byPriority.alta],
     ['Mensagens hoje', `${s.contactedToday} / ${limit}`, over ? 'warn' : ''],
     ['Responderam', s.byStatus.respondeu + s.byStatus.video + s.byStatus.negociando],
     ['Clientes', s.byStatus.cliente, 'good']
@@ -92,6 +93,10 @@ function leadRow(l) {
   const statusOpts = Object.entries(state.config.statuses)
     .map(([k, v]) => `<option value="${k}"${k === l.status ? ' selected' : ''}>${esc(v)}</option>`).join('');
   const rating = l.rating ? `<span class="badge">★ ${esc(l.rating)} (${esc(l.ratingCount)})</span>` : '';
+  const it = l.intel || { level: 'baixa', score: 0, reasons: [], site: { kind: 'desconhecido', label: '' } };
+  const LEVEL = { alta: 'Prioridade alta', media: 'Prioridade média', baixa: 'Prioridade baixa' };
+  const priority = `<span class="prio prio-${esc(it.level)}" title="${esc(it.reasons.join(' · '))}">${esc(LEVEL[it.level])} · ${esc(it.score)}</span>`;
+  const siteBadge = `<span class="badge site-${esc(it.site.kind)}">${esc(it.site.label)}</span>`;
   const sources = (l.sources || []).map(s => `<span class="badge src-${esc(s)}">${s === 'google' ? 'Google' : 'Receita'}</span>`).join('');
   const where = [l.bairro, l.city].filter(Boolean).join(' · ');
   const phone = l.phone ? `<span class="phone">${esc(formatPhone(l.phone))}</span> <span class="badge ${l.mobile ? 'mobile' : 'landline'}">${l.mobile ? 'celular' : 'fixo'}</span>` : '';
@@ -99,7 +104,8 @@ function leadRow(l) {
   return `
     <article class="lead status-${esc(l.status)}" data-id="${esc(l.id)}">
       <div class="lead-main">
-        <div class="lead-name">${l.mapsUrl ? `<a href="${esc(l.mapsUrl)}" target="_blank" rel="noopener noreferrer">${esc(l.name)}</a>` : esc(l.name)}</div>
+        <div class="lead-name">${l.mapsUrl ? `<a href="${esc(l.mapsUrl)}" target="_blank" rel="noopener noreferrer">${esc(l.name)}</a>` : esc(l.name)} ${priority}</div>
+        <div class="lead-meta">${siteBadge} <span class="reasons">${esc(it.reasons.join(' · '))}</span></div>
         <div class="lead-meta">${esc(segLabel(l.segment))}${where ? ' · ' + esc(where) : ''} ${rating} ${sources}</div>
         <div class="lead-meta">${phone}${l.email ? ` · ${esc(l.email)}` : ''}${l.website ? ` · <a href="${esc(l.website)}" target="_blank" rel="noopener noreferrer">site</a>` : ''}${l.cnpj ? ` · CNPJ ${esc(l.cnpj)}` : ''}</div>
         ${l.notes ? `<div class="lead-notes">📝 ${esc(l.notes)}</div>` : ''}
@@ -194,7 +200,7 @@ $('pager').addEventListener('click', (e) => {
 });
 
 let qTimer = null;
-['f-segment', 'f-city', 'f-status', 'f-source', 'f-mobile'].forEach(id => $(id).addEventListener('change', () => { state.page = 1; loadLeads().catch(err => toast(err.message, 'err')); }));
+['f-segment', 'f-city', 'f-status', 'f-source', 'f-mobile', 'f-site', 'f-priority'].forEach(id => $(id).addEventListener('change', () => { state.page = 1; loadLeads().catch(err => toast(err.message, 'err')); }));
 $('f-q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.page = 1; loadLeads().catch(err => toast(err.message, 'err')); }, 300); });
 
 // ─── Google ──────────────────────────────────────────────────────────────────
@@ -258,10 +264,10 @@ $('btn-google').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = 'Buscando... (pode levar alguns minutos)';
   const out = $('g-result');
   try {
-    const r = await api('/api/google/search', { method: 'POST', body: { segments, areas, maxCalls: Number($('g-max').value) || 40, minPopulation: Number($('g-minpop').value) } });
+    const r = await api('/api/google/search', { method: 'POST', body: { segments, areas, maxCalls: Number($('g-max').value) || 40, minPopulation: Number($('g-minpop').value), onlyWithoutSite: $('g-nosite').checked } });
     out.hidden = false;
     out.innerHTML = `
-      <strong>${r.added} contatos novos</strong> · ${r.merged} já existiam (dados completados) · ${r.skipped} sem telefone · ${r.closed} fechados<br>
+      <strong>${r.added} contatos novos</strong> · ${r.merged} já existiam (dados completados) · ${r.skipped} sem telefone · ${r.closed} fechados${r.withSite ? ` · <strong>${r.withSite} ignorados por já terem site</strong>` : ''}<br>
       ${r.queriesDone} buscas feitas em ${r.calls} consultas ao Google.
       ${r.queriesLeft ? `<br><strong>Faltam ${r.queriesLeft} buscas.</strong> Clique em Buscar de novo para continuar.` : '<br>Todas as buscas desta seleção foram feitas.'}
       ${r.errors.length ? `<div class="err-list">${r.errors.slice(0, 5).map(esc).join('<br>')}</div>` : ''}`;
@@ -381,6 +387,8 @@ function renderAutosendForm(cfg) {
   $('as-start').value = cfg.start;
   $('as-end').value = cfg.end;
   $('as-source').value = cfg.source || '';
+  $('as-nosite').checked = cfg.onlyWithoutSite !== false;
+  $('as-unverified').checked = cfg.includeUnverified !== false;
   $('as-cities').value = (cfg.cities || []).join('\n');
   $('as-days').innerHTML = DAY_LABEL.map((d, i) => `<label class="chip"><input type="checkbox" name="as-day" value="${i}"${cfg.days.includes(i) ? ' checked' : ''}> ${d}</label>`).join('');
   $('as-segments').innerHTML = state.config.segments.map(sg => `<label class="chip"><input type="checkbox" name="as-seg" value="${esc(sg.id)}"${cfg.segments.includes(sg.id) ? ' checked' : ''}> ${esc(sg.label)}</label>`).join('');
@@ -442,6 +450,7 @@ $('btn-as-save').addEventListener('click', async () => {
   try {
     const data = await api('/api/autosend', { method: 'PUT', body: {
       dailyLimit: Number($('as-daily').value), start: $('as-start').value, end: $('as-end').value, source: $('as-source').value,
+      onlyWithoutSite: $('as-nosite').checked, includeUnverified: $('as-unverified').checked,
       days: checked('as-day').map(Number), segments: checked('as-seg'),
       cities: $('as-cities').value.split('\n').map(c => c.trim()).filter(Boolean)
     } });

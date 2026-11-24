@@ -35,6 +35,21 @@
           <option value="google">Só Google</option>
           <option value="receita">Só Receita</option>
         </select>
+        <select id="f-site">
+          <option value="">Com e sem site</option>
+          <option value="sem">Sem site próprio</option>
+          <option value="nenhum">Sem site nenhum</option>
+          <option value="social">Só rede social</option>
+          <option value="desconhecido">Site não verificado</option>
+          <option value="proprio">Com site próprio</option>
+          <option value="agendamento">Já usa plataforma de agendamento</option>
+        </select>
+        <select id="f-priority">
+          <option value="">Todas as prioridades</option>
+          <option value="alta">Prioridade alta</option>
+          <option value="media">Prioridade média</option>
+          <option value="baixa">Prioridade baixa</option>
+        </select>
         <label class="check"><input type="checkbox" id="f-mobile"> Só celular</label>
         <a class="btn btn-ghost btn-sm" id="btn-csv" href="/api/leads.csv">Exportar planilha</a>
       </div>
@@ -109,6 +124,9 @@
             </select>
           </label>
         </div>
+        <label class="check option-strong"><input type="checkbox" id="as-nosite"> Enviar só para quem <strong>não tem site próprio</strong> <span class="muted">(recomendado)</span></label>
+        <label class="check"><input type="checkbox" id="as-unverified"> Incluir contatos da Receita com site não verificado</label>
+        <p class="muted small">A fila começa pelos contatos de <strong>prioridade mais alta</strong>: sem site, com celular e ativos no Google.</p>
         <h3>Dias da semana</h3>
         <div class="chips" id="as-days"></div>
         <h3>Segmentos <small class="muted">(nenhum marcado = todos)</small></h3>
@@ -172,6 +190,7 @@
           </label>
           <p class="muted small">Cada consulta traz até 20 empresas e conta na sua cota do Google. Clique de novo para continuar de onde parou.</p>
         </div>
+        <label class="check option-strong"><input type="checkbox" id="g-nosite" checked> Guardar só empresas <strong>sem site próprio</strong> (sem site ou só Instagram/Facebook/WhatsApp). Quem já tem site ou usa plataforma de agendamento é ignorado. <span class="muted">(recomendado)</span></label>
         <div class="actions">
           <button class="btn btn-primary" id="btn-google">Buscar</button>
           <button class="btn btn-ghost" id="btn-save-areas">Salvar bairros como padrão</button>

@@ -54,6 +54,13 @@ const placesServer = http.createServer((req, res) => {
           place('d0', 'Odonto 0 (repetido)', '(31) 98000-0000') // mesmo placeId da página 1
         ];
       }
+    } else if (q.textQuery.startsWith('nutricionista em Lourdes')) {
+      places = [
+        place('s1', 'Nutri Site Próprio', '(31) 97000-0001', { websiteUri: 'https://nutrisite.com.br' }),
+        place('s2', 'Nutri Instagram', '(31) 97000-0002', { websiteUri: 'https://www.instagram.com/nutri' }),
+        place('s3', 'Nutri Doctoralia', '(31) 97000-0003', { websiteUri: 'https://www.doctoralia.com.br/nutri' }),
+        place('s4', 'Nutri Sem Site', '(31) 97000-0004', { userRatingCount: 50, rating: 4.9 })
+      ];
     } else if (q.textQuery.startsWith('clínica odontológica em Savassi')) {
       places = [place('d0', 'Odonto 0', '(31) 98000-0000'), place('o1', 'Mesmo telefone outro id', '(31) 98000-0001')];
     } else {
@@ -191,6 +198,25 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     r = await call('POST', '/api/google/search', { segments: ['psicologia'], areas: ['Sion, Belo Horizonte', 'Serra, Belo Horizonte'], maxCalls: 1 });
     check('Google: respeita o limite e informa o que falta', r.json.calls === 1 && r.json.queriesLeft === 3, JSON.stringify(r.json));
 
+    // Inteligência: quem tem site próprio ou usa plataforma de agendamento não entra
+    r = await call('POST', '/api/google/search', { segments: ['nutricao'], areas: ['Lourdes, Belo Horizonte'] });
+    check('Google: guarda só quem não tem site próprio', r.json.added === 2 && r.json.withSite === 2, JSON.stringify(r.json));
+    r = await call('GET', '/api/leads?q=Nutri&pageSize=50');
+    const nutri = Object.fromEntries(r.json.items.map(l => [l.name, l.intel]));
+    check('Inteligência: "Sem site" e "Só Instagram" classificados', nutri['Nutri Sem Site']?.site.kind === 'nenhum' && nutri['Nutri Instagram']?.site.kind === 'social', JSON.stringify(nutri));
+    check('Inteligência: sem site + celular + bem avaliado = prioridade alta', nutri['Nutri Sem Site']?.level === 'alta' && nutri['Nutri Sem Site'].reasons.includes('Sem site'), JSON.stringify(nutri['Nutri Sem Site']));
+    r = await call('POST', '/api/google/search', { segments: ['nutricao'], areas: ['Lourdes, Belo Horizonte'], redo: true, onlyWithoutSite: false });
+    check('Google: com a opção desligada, guarda também quem tem site', r.json.added === 2, JSON.stringify(r.json));
+    r = await call('GET', '/api/leads?site=agendamento');
+    check('Filtro: "já usa plataforma de agendamento"', r.json.total === 1 && r.json.items[0].intel.site.label === 'Usa Doctoralia', JSON.stringify(r.json.items.map(i => i.intel.site)));
+    r = await call('GET', '/api/leads?site=sem&pageSize=200');
+    check('Filtro: "sem site próprio"', r.json.items.length > 0 && r.json.items.every(l => ['nenhum', 'social'].includes(l.intel.site.kind)));
+    r = await call('GET', '/api/leads?q=Nutri&pageSize=50');
+    check('Lista ordenada pela prioridade', r.json.items[0].name === 'Nutri Sem Site' && r.json.items[r.json.items.length - 1].name === 'Nutri Doctoralia', r.json.items.map(i => i.name).join(', '));
+    r = await call('GET', '/api/leads?priority=alta&pageSize=200');
+    check('Filtro por prioridade', r.json.items.every(l => l.intel.level === 'alta'));
+    check('Indicadores: "sem site próprio" e prioridade', typeof r.json.stats.noSite === 'number' && r.json.stats.bySite.agendamento === 1 && r.json.stats.byPriority.alta > 0, JSON.stringify(r.json.stats.bySite));
+
     // Andamento
     const target = all.find(l => l.mobile);
     r = await call('POST', `/api/leads/${target.id}/contacted`);
@@ -247,7 +273,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     // Planilha
     r = await call('GET', '/api/leads.csv');
-    check('Planilha: BOM + cabeçalho + linhas', r.text.charCodeAt(0) === 0xFEFF && r.text.includes('"Nome";"Segmento"') && r.text.split('\r\n').length === 27, r.text.split('\r\n').length);
+    check('Planilha: BOM + cabeçalho com prioridade + linhas', r.text.charCodeAt(0) === 0xFEFF && r.text.includes('"Prioridade";"Nota";"Site";"Motivos";"Nome"') && r.text.split('\r\n').length === 31, r.text.split('\r\n').length);
     check('Planilha: nome perigoso exportado como texto', r.text.includes('Odonto <img src=x onerror=alert(1)>') && !/;"=/.test(r.text));
 
     // Configurações
@@ -263,7 +289,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     // Persistência
     app.kill('SIGTERM'); await sleep(500);
     const saved = JSON.parse(fs.readFileSync(path.join(TMP, 'data', 'leads.json'), 'utf8'));
-    check('Dados gravados em disco ao desligar', saved.length === 26, saved.length);
+    check('Dados gravados em disco ao desligar', saved.length === 30, saved.length);
   } catch (e) {
     fail++; console.log('FAIL erro inesperado:', e);
   } finally {
