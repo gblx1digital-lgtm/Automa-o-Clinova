@@ -25,6 +25,16 @@ Site particular para encontrar e abordar potenciais clientes do CLINOVA: clínic
 4. Em **Settings → Networking → Generate Domain**, gere um endereço, por exemplo `clinova-prospeccao.up.railway.app`. Se quiser, use um subdomínio seu, como `prospeccao.useclinova.com`.
 5. Abra o endereço, entre com a senha e comece.
 
+## Inteligência: foco em quem não tem site
+
+Quem **não tem site próprio** (ou só tem Instagram, Facebook, Linktree ou WhatsApp) normalmente agenda tudo na mão pelo WhatsApp: é quem mais precisa do CLINOVA. Quem já tem site ou já usa uma plataforma de agendamento (Doctoralia, Booksy, Trinks, iClinic, Feegow, SimplesVet...) tende a já ter solução.
+
+- Cada contato recebe um **tipo de site** (Sem site · Só rede social · Site próprio · Usa plataforma de agendamento · Não verificado) e uma **prioridade** (Alta, Média, Baixa) com os motivos: sem site, tem celular, avaliações e nota no Google, e-mail com domínio próprio.
+- **Busca no Google**: por padrão guarda só empresas **sem site próprio** (o resultado mostra quantas foram ignoradas por já terem site).
+- **Envio automático**: por padrão envia só para quem **não tem site próprio**, começando pela **maior prioridade**.
+- **Contatos**: filtros por tipo de site e por prioridade; a lista e a planilha saem ordenadas pela prioridade.
+- Contatos só da Receita têm o site "não verificado" (a Receita não informa site); e-mail com domínio próprio (ex.: contato@clinica.com.br) conta como site próprio.
+
 ## Buscar em um estado inteiro
 
 - **Google**: em "Onde buscar", escolha o estado e o tamanho mínimo das cidades (100 mil, 50 mil, 20 mil, 10 mil habitantes ou todas) e clique em **Preencher com as cidades do estado**. Também dá para escrever só a sigla (`MG`) ou "estado de Minas Gerais" numa linha. A tela mostra quantas buscas isso vai gerar antes de você clicar em Buscar.

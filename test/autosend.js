@@ -36,6 +36,7 @@ for (let i = 1; i <= 45; i++) seed.push(lead(i));
 seed.push(lead(100, { phone: '3132221111', mobile: false, name: 'Fixo' }));
 seed.push(lead(101, { status: 'sem_interesse', name: 'Pediu para sair', ratingCount: 99999 }));
 seed.push(lead(102, { status: 'contatado', contactedAt: new Date().toISOString(), name: 'Já abordado', ratingCount: 99998 }));
+seed.push(lead(103, { name: 'Tem site próprio', website: 'https://clinicapropria.com.br', ratingCount: 99997 }));
 fs.writeFileSync(path.join(DATA, 'leads.json'), JSON.stringify(seed));
 fs.writeFileSync(path.join(DATA, 'settings.json'), JSON.stringify({ senderName: 'Gabriel' }));
 
@@ -104,6 +105,7 @@ const sent = async () => (await call('GET', '/api/test/wa/sent')).json;
     const phones = s.map(m => m.phone);
     check('ninguém recebe duas vezes', new Set(phones).size === phones.length);
     check('não envia para fixo, quem pediu para sair ou já abordado', !phones.includes('3132221111') && !phones.includes('31980000101') && !phones.includes('31980000102'));
+    check('não envia para quem tem site próprio (inteligência)', !phones.includes('31980000103'));
     const pet = s.find(m => m.phone === '31980000004');
     const odonto = s.find(m => m.phone === '31980000002');
     check('mensagem do segmento certo (pet x saúde)', pet && /pet shops/.test(pet.text) && odonto && /clínicas e consultórios/.test(odonto.text));

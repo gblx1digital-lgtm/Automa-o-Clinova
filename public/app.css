@@ -240,3 +240,16 @@ table.log td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: t
 .state-box label { display: flex; flex-direction: column; gap: 4px; }
 .estimate { margin: 8px 0 0; font-size: 0.88rem; color: #1e3a8a; background: #eff6ff; border-radius: 8px; padding: 8px 10px; }
 .estimate:empty { display: none; }
+
+/* ── Inteligência: prioridade e tipo de site ── */
+.prio { display: inline-block; font-size: 0.74rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; cursor: help; }
+.prio-alta { background: #dcfce7; color: #15803d; }
+.prio-media { background: #fef3c7; color: #92400e; }
+.prio-baixa { background: #f1f5f9; color: #64748b; }
+.badge.site-nenhum, .badge.site-social { background: #dcfce7; color: #15803d; }
+.badge.site-proprio { background: #f1f5f9; color: #64748b; }
+.badge.site-agendamento { background: #fee2e2; color: #b91c1c; }
+.badge.site-desconhecido { background: #f8fafc; color: #64748b; border: 1px dashed #cbd5e1; }
+.reasons { font-size: 0.8rem; color: var(--muted); }
+.option-strong { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; font-weight: 500; }
+.option-strong input { margin-top: 3px; }

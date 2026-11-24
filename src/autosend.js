@@ -14,6 +14,7 @@ const leads = require('./leads');
 const messages = require('./messages');
 const whatsapp = require('./whatsapp');
 const { BY_ID } = require('./segments');
+const intel = require('./intel');
 
 // Em testes (NODE_ENV=test + AUTOSEND_FAST=1) o tempo corre 600x mais rápido
 const SCALE = process.env.NODE_ENV === 'test' && process.env.AUTOSEND_FAST === '1' ? 600 : 1;
@@ -34,7 +35,9 @@ const DEFAULTS = {
   days: [1, 2, 3, 4, 5], // 0 = domingo ... 6 = sábado
   segments: [],
   cities: [],
-  source: ''
+  source: '',
+  onlyWithoutSite: true,   // só quem não tem site próprio (sem site ou só rede social)
+  includeUnverified: true  // inclui quem veio só da Receita (site não verificado)
 };
 
 let nextAt = 0;
@@ -63,6 +66,8 @@ function saveConfig(changes = {}) {
   if (Array.isArray(changes.segments)) cur.segments = changes.segments.filter(id => BY_ID[id]);
   if (Array.isArray(changes.cities)) cur.cities = changes.cities.map(c => String(c).trim()).filter(Boolean).slice(0, 100);
   if (changes.source !== undefined) cur.source = ['google', 'receita'].includes(changes.source) ? changes.source : '';
+  if (changes.onlyWithoutSite !== undefined) cur.onlyWithoutSite = Boolean(changes.onlyWithoutSite);
+  if (changes.includeUnverified !== undefined) cur.includeUnverified = Boolean(changes.includeUnverified);
   s.autosend = cur;
   storage.save('settings');
   return cur;
@@ -99,15 +104,26 @@ function inWindow(cfg, now) {
 
 function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
 
-/** Fila: contatos novos, com celular, nunca abordados, dentro dos filtros. Melhores avaliados primeiro. */
+/**
+ * Fila: contatos novos, com celular, nunca abordados, dentro dos filtros. Por padrão só quem
+ * não tem site próprio. Ordem: maior nota de prioridade primeiro (sem site, ativo no Google...).
+ */
 function queue(cfg = config()) {
   const cities = cfg.cities.map(norm);
+  const siteOk = (l) => {
+    if (!cfg.onlyWithoutSite) return true;
+    const kind = intel.classifySite(l).kind;
+    return kind === 'nenhum' || kind === 'social' || (cfg.includeUnverified && kind === 'desconhecido');
+  };
   return leads.all()
     .filter(l => l.status === 'novo' && l.mobile && !l.contactedAt &&
       (!cfg.segments.length || cfg.segments.includes(l.segment)) &&
       (!cities.length || cities.includes(norm(l.city))) &&
-      (!cfg.source || (l.sources || []).includes(cfg.source)))
-    .sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0) || String(a.createdAt).localeCompare(String(b.createdAt)));
+      (!cfg.source || (l.sources || []).includes(cfg.source)) &&
+      siteOk(l))
+    .map(l => ({ l, s: intel.score(l).score }))
+    .sort((a, b) => b.s - a.s || (b.l.ratingCount || 0) - (a.l.ratingCount || 0) || String(a.l.createdAt).localeCompare(String(b.l.createdAt)))
+    .map(x => x.l);
 }
 
 /** Situação atual (o que o robô está esperando e por quê). */
