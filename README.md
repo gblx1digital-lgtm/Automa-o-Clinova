@@ -32,7 +32,7 @@ Site particular para encontrar e abordar potenciais clientes do CLINOVA: clínic
   - Cada busca do Google traz no máximo 60 empresas: em cidades muito grandes, acrescente bairros para pegar mais.
 - **Receita Federal**: deixe a lista de cidades **vazia** (ou escreva só a sigla) para importar o estado inteiro da UF escolhida.
 
-População por município: IBGE, Censo 2022 (dados do pacote `municipios-br`, licença MIT; veja `src/data/LICENSE-municipios-br.txt`).
+População por município: IBGE, Censo 2022 (dados do pacote `municipios-br`, licença CC0 — domínio público; veja `src/data/LICENSE-municipios-br.txt`).
 
 ## Criar a chave do Google (Places API)
 
