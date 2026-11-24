@@ -162,6 +162,7 @@ function autosendPayload() {
     status: autosend.describe(),
     limits: { minGapSeconds: 60, maxPerHour: autosend.LIMITS.MAX_PER_HOUR, maxPerDay: autosend.LIMITS.MAX_PER_DAY_CEILING },
     log: autosend.log().slice(-60).reverse(),
+    statesAvailable: leads.stats().byState,
     replies: autosend.replies().slice(0, 40),
     whatsapp: whatsapp.status()
   };

@@ -252,4 +252,5 @@ table.log td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: t
 .badge.site-desconhecido { background: #f8fafc; color: #64748b; border: 1px dashed #cbd5e1; }
 .reasons { font-size: 0.8rem; color: var(--muted); }
 .option-strong { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; font-weight: 500; }
-.option-strong input { margin-top: 3px; }
+.option-strong input { margin-top: 3px; flex-shrink: 0; }
+.option-strong > span { flex: 1; }

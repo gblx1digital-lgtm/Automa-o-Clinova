@@ -37,6 +37,10 @@ seed.push(lead(100, { phone: '3132221111', mobile: false, name: 'Fixo' }));
 seed.push(lead(101, { status: 'sem_interesse', name: 'Pediu para sair', ratingCount: 99999 }));
 seed.push(lead(102, { status: 'contatado', contactedAt: new Date().toISOString(), name: 'Já abordado', ratingCount: 99998 }));
 seed.push(lead(103, { name: 'Tem site próprio', website: 'https://clinicapropria.com.br', ratingCount: 99997 }));
+// Contatos de Santa Catarina (no fim da fila: menos avaliações), com a UF escrita de jeitos diferentes
+seed.push(lead(104, { name: 'SC sigla', uf: 'SC', city: 'Joinville', ratingCount: 1 }));
+seed.push(lead(105, { name: 'SC por extenso', uf: 'Santa Catarina', city: 'Blumenau', ratingCount: 1 }));
+seed.push(lead(106, { name: 'SC no endereço', uf: '', city: 'Itajaí', address: 'Rua X, 10 - Centro, Itajaí - SC, 88301-000, Brasil', ratingCount: 1 }));
 fs.writeFileSync(path.join(DATA, 'leads.json'), JSON.stringify(seed));
 fs.writeFileSync(path.join(DATA, 'settings.json'), JSON.stringify({ senderName: 'Gabriel' }));
 
@@ -80,7 +84,12 @@ const sent = async () => (await call('GET', '/api/test/wa/sent')).json;
     r = await call('PUT', '/api/autosend', { start: '00:00', end: '23:59', days: [0, 1, 2, 3, 4, 5, 6], dailyLimit: 9999, segments: [], cities: [] });
     check('limite diário não passa de 300', r.json.config.dailyLimit === 300, r.json.config.dailyLimit);
     check('limites fixos informados (1/min, 30/h)', r.json.limits.minGapSeconds === 60 && r.json.limits.maxPerHour === 30);
-    check('fila só com celulares novos nunca abordados', r.json.status.queue === 45, r.json.status.queue);
+    check('fila só com celulares novos nunca abordados', r.json.status.queue === 48, r.json.status.queue);
+    check('estados disponíveis com a quantidade de contatos', r.json.statesAvailable.SC === 3 && r.json.statesAvailable.MG > 40, JSON.stringify(r.json.statesAvailable));
+    r = await call('PUT', '/api/autosend', { states: ['SC', 'xx'] });
+    check('escolher estado: só Santa Catarina na fila (sigla, nome e endereço)', r.json.config.states.join() === 'SC' && r.json.status.queue === 3, `${r.json.config.states} ${r.json.status.queue}`);
+    r = await call('PUT', '/api/autosend', { states: [] });
+    check('sem estado marcado = todos', r.json.status.queue === 48, r.json.status.queue);
 
     // Erros seguidos pausam sozinho
     await call('POST', '/api/test/wa/fail', { n: 3 });
@@ -88,7 +97,7 @@ const sent = async () => (await call('GET', '/api/test/wa/sent')).json;
     await sleep(2000);
     r = await call('GET', '/api/autosend');
     check('3 erros seguidos pausam o envio automaticamente', r.json.status.enabled === false && /Pausado automaticamente/.test(r.json.status.message), JSON.stringify(r.json.status));
-    check('contatos com erro voltam para a fila', r.json.status.queue === 45 && r.json.log.filter(e => e.result === 'erro').length === 3, r.json.status.queue);
+    check('contatos com erro voltam para a fila', r.json.status.queue === 48 && r.json.log.filter(e => e.result === 'erro').length === 3, r.json.status.queue);
 
     // Envio normal (o 1º da fila não tem WhatsApp)
     await call('POST', '/api/test/wa/no-whatsapp', { phone: '31980000001' });

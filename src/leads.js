@@ -5,6 +5,19 @@ const crypto = require('crypto');
 const storage = require('./storage');
 const { BY_ID } = require('./segments');
 const intel = require('./intel');
+const { STATE_NAMES } = require('./cities');
+
+const UF_BY_NAME = Object.fromEntries(Object.entries(STATE_NAMES).map(([uf, n]) => [n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), uf]));
+
+/** Sigla do estado do contato ("SC"), a partir da UF salva ou do endereço. */
+function leadUF(l) {
+  const raw = String(l.uf || '').trim();
+  if (/^[A-Za-z]{2}$/.test(raw) && STATE_NAMES[raw.toUpperCase()]) return raw.toUpperCase();
+  const byName = UF_BY_NAME[raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()];
+  if (byName) return byName;
+  const m = String(l.address || '').match(/\s-\s([A-Z]{2})(?:,|\s*$)/);
+  return m && STATE_NAMES[m[1]] ? m[1] : '';
+}
 
 const STATUSES = {
   novo: 'Novo',
@@ -151,6 +164,7 @@ function filter(q = {}) {
     (!q.segment || l.segment === q.segment) &&
     (!q.status || (q.status === 'fila' ? l.status === 'novo' && l.mobile : l.status === q.status)) &&
     (!q.city || norm(l.city) === norm(q.city)) &&
+    (!q.state || leadUF(l) === String(q.state).toUpperCase()) &&
     (!q.source || (l.sources || []).includes(q.source)) &&
     (!q.mobile || l.mobile) &&
     (!q.site || siteMatches(l, q.site)) &&
@@ -187,11 +201,14 @@ function stats() {
   const cities = new Set();
   let mobile = 0, contactedToday = 0;
   const bySite = { nenhum: 0, social: 0, proprio: 0, agendamento: 0, desconhecido: 0 };
+  const byState = {};
   const byPriority = { alta: 0, media: 0, baixa: 0 };
   const today = todayBR();
   for (const l of list) {
     const i = intel.score(l);
     bySite[i.site.kind]++;
+    const uf = leadUF(l);
+    if (uf) byState[uf] = (byState[uf] || 0) + 1;
     if (l.status === 'novo') byPriority[i.level]++;
     byStatus[l.status] = (byStatus[l.status] || 0) + 1;
     bySegment[l.segment] = (bySegment[l.segment] || 0) + 1;
@@ -199,7 +216,7 @@ function stats() {
     if (l.mobile) mobile++;
     if (l.contactedAt && new Date(new Date(l.contactedAt).getTime() - 3 * 3600000).toISOString().slice(0, 10) === today) contactedToday++;
   }
-  return { total: list.length, mobile, contactedToday, byStatus, bySegment, bySite, byPriority, noSite: bySite.nenhum + bySite.social, cities: [...cities].sort() };
+  return { total: list.length, mobile, contactedToday, byStatus, bySegment, bySite, byPriority, noSite: bySite.nenhum + bySite.social, byState, cities: [...cities].sort() };
 }
 
 function find(id) { return all().find(l => l.id === id) || null; }
@@ -252,6 +269,6 @@ function toCsv(q = {}) {
 }
 
 module.exports = {
-  STATUSES, DO_NOT_CONTACT, all, upsert, exists, buildIndex, query, stats, find, update, markContacted, toCsv,
+  STATUSES, DO_NOT_CONTACT, all, upsert, exists, buildIndex, leadUF, query, stats, find, update, markContacted, toCsv,
   normalizePhone, isMobile, formatPhone, titleCase
 };
