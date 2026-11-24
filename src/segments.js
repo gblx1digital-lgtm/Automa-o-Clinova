@@ -29,10 +29,13 @@ const BY_ID = Object.fromEntries(SEGMENTS.map(s => [s.id, s]));
 const BY_CNAE = {};
 for (const s of SEGMENTS) for (const c of s.cnaes) BY_CNAE[c] = s.id;
 
-/** Mensagens padrão por grupo. Variáveis: {nome}, {seunome}. */
+/**
+ * Mensagens padrão por grupo. Variáveis: {saudacao} (Bom dia/Boa tarde/Boa noite), {seunome}, {nome}.
+ * Para variar o texto (recomendado no envio automático), escreva versões separadas por uma linha com ---
+ */
 const DEFAULT_TEMPLATES = {
   saude:
-`Bom dia! Tudo bem? Aqui é o {seunome}, da Clinova.
+`{saudacao}! Tudo bem? Aqui é o {seunome}, da Clinova.
 
 Ajudo clínicas e consultórios a encher a agenda sem a recepção ficar presa no WhatsApp: o paciente agenda sozinho pelo link do Instagram, a qualquer hora, e recebe confirmação e lembrete automáticos, o que ajuda a reduzir as faltas.
 
@@ -40,7 +43,7 @@ Gravei um vídeo curto mostrando funcionando. Posso te mandar por aqui?
 
 (Se não fizer sentido, é só me avisar que eu não mando mais mensagens.)`,
   psicologia:
-`Bom dia! Tudo bem? Aqui é o {seunome}, da Clinova.
+`{saudacao}! Tudo bem? Aqui é o {seunome}, da Clinova.
 
 Ajudo psicólogos e terapeutas a organizar a agenda sem perder tempo no WhatsApp: o paciente marca a sessão sozinho pelo link, presencial ou online, e recebe confirmação e lembrete automáticos, o que ajuda a reduzir as faltas.
 
@@ -48,7 +51,7 @@ Gravei um vídeo curto mostrando funcionando. Posso te mandar por aqui?
 
 (Se não fizer sentido, é só me avisar que eu não mando mais mensagens.)`,
   pet:
-`Bom dia! Tudo bem? Aqui é o {seunome}, da Clinova.
+`{saudacao}! Tudo bem? Aqui é o {seunome}, da Clinova.
 
 Ajudo pet shops e veterinárias a encher a agenda sem a recepção ficar presa no WhatsApp: o tutor agenda sozinho pelo link do Instagram, informando os dados do pet, e recebe confirmação e lembrete automáticos, o que ajuda a reduzir as faltas no banho e tosa e nas consultas.
 
@@ -56,7 +59,7 @@ Gravei um vídeo curto mostrando funcionando. Posso te mandar por aqui?
 
 (Se não fizer sentido, é só me avisar que eu não mando mais mensagens.)`,
   servicos:
-`Bom dia! Tudo bem? Aqui é o {seunome}, da Clinova.
+`{saudacao}! Tudo bem? Aqui é o {seunome}, da Clinova.
 
 Ajudo salões e barbearias a encher a agenda sem ficar presos no WhatsApp: o cliente agenda sozinho pelo link do Instagram, a qualquer hora, e recebe confirmação e lembrete automáticos, o que ajuda a reduzir as faltas.
 

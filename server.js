@@ -11,6 +11,8 @@ const storage = require('./src/storage');
 const leads = require('./src/leads');
 const google = require('./src/google');
 const receita = require('./src/receita');
+const whatsapp = require('./src/whatsapp');
+const autosend = require('./src/autosend');
 const { SEGMENTS, DEFAULT_TEMPLATES, DEFAULT_AREAS, DEFAULT_CITIES } = require('./src/segments');
 
 const app = express();
@@ -136,6 +138,43 @@ app.post('/api/receita/import', (req, res) => {
 });
 app.post('/api/receita/cancel', (req, res) => res.json(receita.cancel()));
 
+// ─── WhatsApp (QR Code) e envio automático ────────────────────────────────────
+app.get('/api/whatsapp/status', (req, res) => res.json(whatsapp.status()));
+app.post('/api/whatsapp/connect', async (req, res) => res.json(await whatsapp.start(Boolean(req.body?.forceNew), true)));
+app.post('/api/whatsapp/logout', async (req, res) => {
+  autosend.saveConfig({ enabled: false }); // sem WhatsApp, não faz sentido continuar ligado
+  res.json(await whatsapp.logout());
+});
+
+function autosendPayload() {
+  return {
+    config: autosend.config(),
+    status: autosend.describe(),
+    limits: { minGapSeconds: 60, maxPerHour: autosend.LIMITS.MAX_PER_HOUR, maxPerDay: autosend.LIMITS.MAX_PER_DAY_CEILING },
+    log: autosend.log().slice(-60).reverse(),
+    replies: autosend.replies().slice(0, 40),
+    whatsapp: whatsapp.status()
+  };
+}
+app.get('/api/autosend', (req, res) => res.json(autosendPayload()));
+app.put('/api/autosend', (req, res) => {
+  const b = req.body || {};
+  if (b.enabled === true && whatsapp.status().status !== 'connected') {
+    return res.status(400).json({ error: 'Conecte o WhatsApp pelo QR Code antes de ligar o envio automático.' });
+  }
+  autosend.saveConfig(b);
+  res.json(autosendPayload());
+});
+
+// Rotas só para os testes automáticos (WhatsApp simulado)
+if (whatsapp.FAKE) {
+  app.post('/api/test/wa/pair', (req, res) => { whatsapp.fake.pair(); res.json(whatsapp.status()); });
+  app.post('/api/test/wa/incoming', async (req, res) => res.json({ lead: await whatsapp.fake.incoming(req.body.phone, req.body.text) }));
+  app.get('/api/test/wa/sent', (req, res) => res.json(whatsapp.fake.sent));
+  app.post('/api/test/wa/no-whatsapp', (req, res) => { whatsapp.fake.noWhatsApp.add(req.body.phone); res.json({ ok: true }); });
+  app.post('/api/test/wa/fail', (req, res) => { whatsapp.fake.failNext = Number(req.body.n) || 0; res.json({ ok: true }); });
+}
+
 app.use((err, req, res, next) => {
   console.error('[erro]', err);
   res.status(500).json({ error: 'Erro interno.' });
@@ -146,4 +185,6 @@ app.listen(PORT, () => {
   console.log(`🔎 CLINOVA Prospecção rodando na porta ${PORT}`);
   if (!process.env.ADMIN_PASSWORD) console.warn('⚠️  Defina ADMIN_PASSWORD para conseguir entrar.');
   if (!google.isConfigured()) console.warn('ℹ️  Sem GOOGLE_PLACES_API_KEY: a busca no Google fica desligada (a importação da Receita funciona).');
+  whatsapp.autoStart();  // reconecta se já leu o QR antes
+  autosend.start();      // motor de envio (só envia se estiver ligado na tela)
 });
