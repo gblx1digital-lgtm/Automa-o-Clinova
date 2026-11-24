@@ -12,6 +12,7 @@
     <div class="brand"><span class="brand-mark">C</span> CLINOVA <span class="brand-sub">Prospecção</span></div>
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="contatos" role="tab">Contatos</button>
+      <button class="tab" data-tab="whatsapp" role="tab">WhatsApp automático</button>
       <button class="tab" data-tab="google" role="tab">Buscar no Google</button>
       <button class="tab" data-tab="receita" role="tab">Receita Federal</button>
       <button class="tab" data-tab="mensagens" role="tab">Mensagens</button>
@@ -42,6 +43,97 @@
 
       <div class="list" id="lead-list"></div>
       <div class="pager" id="pager"></div>
+    </section>
+
+    <!-- ================= WHATSAPP AUTOMÁTICO ================= -->
+    <section class="panel" id="tab-whatsapp">
+      <div class="wa-grid">
+        <div class="card">
+          <div class="card-head">
+            <h2>Conexão</h2>
+            <span class="pill" id="wa-pill">—</span>
+          </div>
+          <div id="wa-connected" hidden>
+            <p class="wa-number" id="wa-number"></p>
+            <p class="muted small" id="wa-since"></p>
+          </div>
+          <div id="wa-qr-box" hidden>
+            <img id="wa-qr" alt="QR Code para conectar o WhatsApp" width="260" height="260">
+            <ol class="steps">
+              <li>Abra o WhatsApp no celular do número de prospecção.</li>
+              <li>Toque em <strong>⋮ Mais opções</strong> (Android) ou <strong>Configurações</strong> (iPhone) → <strong>Aparelhos conectados</strong>.</li>
+              <li>Toque em <strong>Conectar um aparelho</strong> e aponte a câmera para este QR Code.</li>
+            </ol>
+          </div>
+          <p class="muted small" id="wa-msg"></p>
+          <div class="actions">
+            <button class="btn btn-primary" id="btn-wa-connect">Conectar WhatsApp</button>
+            <button class="btn btn-ghost" id="btn-wa-newqr" hidden>Gerar novo QR Code</button>
+            <button class="btn btn-ghost" id="btn-wa-logout" hidden>Desconectar</button>
+          </div>
+          <div class="notice small">Use um <strong>número só para prospecção</strong>, separado do seu número principal. Envios automáticos de prospecção vão contra os termos do WhatsApp; os limites abaixo reduzem, mas não eliminam, o risco de bloqueio.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Envio automático</h2>
+            <button class="btn btn-primary" id="btn-as-toggle">Ligar</button>
+          </div>
+          <div class="as-status" id="as-status">
+            <span class="dot"></span>
+            <div>
+              <strong id="as-message">—</strong>
+              <div class="muted small" id="as-next"></div>
+            </div>
+          </div>
+          <div class="meters">
+            <div class="meter"><small>Última hora</small><strong id="as-hour">0 / 30</strong><div class="progress"><span id="as-hour-bar"></span></div></div>
+            <div class="meter"><small>Hoje</small><strong id="as-day">0 / 0</strong><div class="progress"><span id="as-day-bar"></span></div></div>
+            <div class="meter"><small>Na fila</small><strong id="as-queue">0</strong><div class="muted small">contatos com celular</div></div>
+          </div>
+          <p class="fixed-limits">🔒 Limites fixos para proteger o número: <strong>no mínimo 1 minuto entre mensagens</strong> (mais um intervalo aleatório) e <strong>no máximo 30 por hora</strong>. Quem responder sai da fila; quem pedir para parar nunca mais recebe.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Regras do envio</h2>
+        <div class="row">
+          <label>Limite por dia <input type="number" id="as-daily" min="1" max="300"></label>
+          <label>Começa às <input type="time" id="as-start"></label>
+          <label>Termina às <input type="time" id="as-end"></label>
+          <label>Fonte
+            <select id="as-source">
+              <option value="">Google e Receita</option>
+              <option value="google">Só Google</option>
+              <option value="receita">Só Receita</option>
+            </select>
+          </label>
+        </div>
+        <h3>Dias da semana</h3>
+        <div class="chips" id="as-days"></div>
+        <h3>Segmentos <small class="muted">(nenhum marcado = todos)</small></h3>
+        <div class="chips" id="as-segments"></div>
+        <h3>Cidades <small class="muted">(uma por linha; vazio = todas)</small></h3>
+        <textarea id="as-cities" rows="3" placeholder="Belo Horizonte"></textarea>
+        <div class="actions"><button class="btn btn-primary" id="btn-as-save">Salvar regras</button></div>
+        <p class="muted small">A mensagem enviada é a do segmento de cada contato (aba <strong>Mensagens</strong>). Dica: escreva 2 ou 3 versões separadas por uma linha com <code>---</code> para as mensagens não ficarem idênticas.</p>
+      </div>
+
+      <div class="wa-grid">
+        <div class="card">
+          <h2>Últimos envios</h2>
+          <div class="table-wrap">
+            <table class="log">
+              <thead><tr><th>Horário</th><th>Contato</th><th>Resultado</th></tr></thead>
+              <tbody id="as-log"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Respostas recebidas</h2>
+          <div id="as-replies"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ================= GOOGLE ================= -->
@@ -95,7 +187,7 @@
     <section class="panel" id="tab-mensagens">
       <div class="card">
         <h2>Mensagens do WhatsApp</h2>
-        <p class="muted">O botão "WhatsApp" de cada contato abre a conversa com a mensagem do segmento já escrita; você só confere e envia. Variáveis: <code>{seunome}</code> e <code>{nome}</code> (nome da empresa).</p>
+        <p class="muted">Estas mensagens são usadas no envio automático e no botão "WhatsApp" de cada contato. Variáveis: <code>{saudacao}</code> (Bom dia / Boa tarde / Boa noite, conforme a hora), <code>{seunome}</code> e <code>{nome}</code> (nome da empresa). Para variar o texto, escreva versões separadas por uma linha com <code>---</code>; cada envio sorteia uma.</p>
         <div class="row">
           <label>Seu nome <input type="text" id="m-sender" maxlength="60" placeholder="Ex.: Gabriel"></label>
           <label>Limite de mensagens por dia <input type="number" id="m-limit" min="1" max="200"></label>

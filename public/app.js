@@ -38,6 +38,7 @@ document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', (
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `tab-${btn.dataset.tab}`));
   if (btn.dataset.tab === 'receita') pollReceita();
+  if (btn.dataset.tab === 'whatsapp') loadAutosend();
 }));
 
 $('btn-logout').addEventListener('click', async () => { await api('/api/logout', { method: 'POST' }).catch(() => {}); window.location.href = '/login'; });
@@ -127,10 +128,16 @@ function renderList(data) {
     : `<span>${data.total} contato(s)</span>`;
 }
 
+function greeting() {
+  const h = new Date(Date.now() - 3 * 3600000).getUTCHours(); // horário de Brasília
+  return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+}
+
 function buildMessage(lead) {
   const s = state.config.settings;
-  const tpl = s.templates[segGroup(lead.segment)] || s.templates.saude;
-  return tpl.replace(/\{seunome\}/g, s.senderName || 'Clinova').replace(/\{nome\}/g, lead.name);
+  const options = String(s.templates[segGroup(lead.segment)] || s.templates.saude).split(/\n\s*-{3,}\s*\n/).map(t => t.trim()).filter(Boolean);
+  const tpl = options[Math.floor(Math.random() * options.length)] || '';
+  return tpl.replace(/\{saudacao\}/g, greeting()).replace(/\{seunome\}/g, s.senderName || 'Clinova').replace(/\{nome\}/g, lead.name);
 }
 
 $('lead-list').addEventListener('click', async (e) => {
@@ -270,6 +277,134 @@ $('btn-receita').addEventListener('click', async () => {
 
 $('btn-receita-cancel').addEventListener('click', async () => {
   try { renderReceita(await api('/api/receita/cancel', { method: 'POST' })); pollReceita(); } catch (err) { toast(err.message, 'err'); }
+});
+
+// ─── WhatsApp automático ─────────────────────────────────────────────────────
+const WA_LABEL = { off: 'Desconectado', starting: 'Conectando...', qr: 'Aguardando leitura do QR', connected: 'Conectado', reconnecting: 'Reconectando...', error: 'Erro' };
+const DAY_LABEL = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const RESULT_LABEL = { enviada: 'Enviada', sem_whatsapp: 'Sem WhatsApp', erro: 'Erro' };
+state.as = null;
+state.asTimer = null;
+state.asFormDirty = false;
+
+function setBar(id, value, max) { const el = $(id); if (el) el.style.width = `${Math.min(100, max ? Math.round((value / max) * 100) : 0)}%`; }
+const show = (id, visible) => { $(id).hidden = !visible; };
+const time = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+function renderWhatsapp(wa) {
+  const pill = $('wa-pill');
+  pill.textContent = WA_LABEL[wa.status] || wa.status;
+  pill.className = `pill pill-${wa.status}`;
+  show('wa-connected', wa.status === 'connected');
+  show('wa-qr-box', wa.status === 'qr' && Boolean(wa.qrDataUrl));
+  if (wa.qrDataUrl && $('wa-qr').src !== wa.qrDataUrl) $('wa-qr').src = wa.qrDataUrl;
+  $('wa-number').textContent = wa.phone ? `${wa.phone}${wa.name ? ' · ' + wa.name : ''}` : '';
+  $('wa-since').textContent = wa.connectedAt ? `Conectado desde ${time(wa.connectedAt)}` : '';
+  $('wa-msg').textContent = wa.status === 'qr' ? 'O QR Code muda a cada poucos segundos; esta tela atualiza sozinha.' : (wa.lastError || '');
+  show('btn-wa-connect', ['off', 'error'].includes(wa.status));
+  show('btn-wa-newqr', ['qr', 'reconnecting', 'error'].includes(wa.status));
+  show('btn-wa-logout', ['connected', 'reconnecting'].includes(wa.status) || wa.hasSession);
+}
+
+function renderAutosendStatus(st) {
+  $('as-message').textContent = st.message;
+  $('as-status').className = `as-status st-${st.state}`;
+  $('as-hour').textContent = `${st.hourCount} / ${st.hourLimit}`;
+  $('as-day').textContent = `${st.dayCount} / ${st.dayLimit}`;
+  $('as-queue').textContent = st.queue;
+  setBar('as-hour-bar', st.hourCount, st.hourLimit);
+  setBar('as-day-bar', st.dayCount, st.dayLimit);
+  const tg = $('btn-as-toggle');
+  tg.textContent = st.enabled ? 'Pausar envio' : 'Ligar envio automático';
+  tg.className = st.enabled ? 'btn btn-ghost' : 'btn btn-primary';
+  updateCountdown();
+}
+
+function updateCountdown() {
+  const st = state.as?.status;
+  if (!st || !st.nextAt) { $('as-next').textContent = ''; return; }
+  const secs = Math.max(0, Math.round((new Date(st.nextAt).getTime() - Date.now()) / 1000));
+  const m = Math.floor(secs / 60), s2 = secs % 60;
+  $('as-next').textContent = `Próximo envio em ${m ? m + ' min ' : ''}${s2} s`;
+}
+setInterval(updateCountdown, 1000);
+
+function renderAutosendForm(cfg) {
+  if (state.asFormDirty) return; // não apaga o que você está editando
+  $('as-daily').value = cfg.dailyLimit;
+  $('as-start').value = cfg.start;
+  $('as-end').value = cfg.end;
+  $('as-source').value = cfg.source || '';
+  $('as-cities').value = (cfg.cities || []).join('\n');
+  $('as-days').innerHTML = DAY_LABEL.map((d, i) => `<label class="chip"><input type="checkbox" name="as-day" value="${i}"${cfg.days.includes(i) ? ' checked' : ''}> ${d}</label>`).join('');
+  $('as-segments').innerHTML = state.config.segments.map(sg => `<label class="chip"><input type="checkbox" name="as-seg" value="${esc(sg.id)}"${cfg.segments.includes(sg.id) ? ' checked' : ''}> ${esc(sg.label)}</label>`).join('');
+}
+
+function renderAutosendLists(data) {
+  $('as-log').innerHTML = data.log.length ? data.log.map(e => `
+    <tr><td>${esc(time(e.at))}</td><td>${esc(e.name)}<div class="muted small">${esc(formatPhone(e.phone))}</div></td>
+    <td><span class="badge res-${esc(e.result)}">${esc(RESULT_LABEL[e.result] || e.result)}</span>${e.error ? `<div class="muted small">${esc(e.error)}</div>` : ''}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="muted">Nenhum envio ainda.</td></tr>';
+  $('as-replies').innerHTML = data.replies.length ? data.replies.map(r => `
+    <div class="reply${r.optOut ? ' optout' : ''}">
+      <div class="reply-head"><strong>${esc(r.name)}</strong> <span class="muted small">${esc(time(r.at))}</span>
+        ${r.optOut ? '<span class="badge res-erro">Pediu para parar</span>' : '<span class="badge res-enviada">Respondeu</span>'}</div>
+      <div class="reply-text">${esc(r.text) || '<em class="muted">(mídia ou mensagem sem texto)</em>'}</div>
+      <a class="btn btn-ghost btn-sm" href="https://wa.me/55${esc(r.phone)}" target="_blank" rel="noopener noreferrer">Abrir conversa</a>
+    </div>`).join('') : '<p class="muted">Quando alguém responder, aparece aqui e sai da fila automática.</p>';
+}
+
+async function loadAutosend() {
+  clearTimeout(state.asTimer);
+  try {
+    const data = await api('/api/autosend');
+    state.as = data;
+    renderWhatsapp(data.whatsapp);
+    renderAutosendStatus(data.status);
+    renderAutosendForm(data.config);
+    renderAutosendLists(data);
+  } catch (err) { /* tenta de novo */ }
+  if ($('tab-whatsapp').classList.contains('active')) {
+    const fast = state.as && ['starting', 'qr', 'reconnecting'].includes(state.as.whatsapp.status);
+    state.asTimer = setTimeout(loadAutosend, fast ? 2000 : 5000);
+  }
+}
+
+['as-daily', 'as-start', 'as-end', 'as-source', 'as-cities'].forEach(id => $(id).addEventListener('input', () => { state.asFormDirty = true; }));
+['as-days', 'as-segments'].forEach(id => $(id).addEventListener('change', () => { state.asFormDirty = true; }));
+
+$('btn-wa-connect').addEventListener('click', async () => {
+  try { renderWhatsapp(await api('/api/whatsapp/connect', { method: 'POST', body: {} })); loadAutosend(); } catch (err) { toast(err.message, 'err'); }
+});
+$('btn-wa-newqr').addEventListener('click', async () => {
+  try { renderWhatsapp(await api('/api/whatsapp/connect', { method: 'POST', body: { forceNew: true } })); loadAutosend(); } catch (err) { toast(err.message, 'err'); }
+});
+$('btn-wa-logout').addEventListener('click', async () => {
+  if (!window.confirm('Desconectar este WhatsApp? O envio automático será pausado.')) return;
+  try { renderWhatsapp(await api('/api/whatsapp/logout', { method: 'POST' })); loadAutosend(); } catch (err) { toast(err.message, 'err'); }
+});
+$('btn-as-toggle').addEventListener('click', async () => {
+  const enable = !state.as?.status?.enabled;
+  try {
+    const data = await api('/api/autosend', { method: 'PUT', body: { enabled: enable } });
+    state.as = data;
+    renderAutosendStatus(data.status);
+    toast(enable ? 'Envio automático ligado.' : 'Envio automático pausado.');
+  } catch (err) { toast(err.message, 'err'); }
+});
+$('btn-as-save').addEventListener('click', async () => {
+  try {
+    const data = await api('/api/autosend', { method: 'PUT', body: {
+      dailyLimit: Number($('as-daily').value), start: $('as-start').value, end: $('as-end').value, source: $('as-source').value,
+      days: checked('as-day').map(Number), segments: checked('as-seg'),
+      cities: $('as-cities').value.split('\n').map(c => c.trim()).filter(Boolean)
+    } });
+    state.asFormDirty = false;
+    state.as = data;
+    renderAutosendForm(data.config);
+    renderAutosendStatus(data.status);
+    toast('Regras salvas.');
+  } catch (err) { toast(err.message, 'err'); }
 });
 
 // ─── Mensagens ───────────────────────────────────────────────────────────────

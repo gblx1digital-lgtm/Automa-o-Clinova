@@ -15,6 +15,8 @@
 }
 
 * { box-sizing: border-box; }
+/* "hidden" sempre esconde, mesmo em elementos com display próprio (ex.: botões) */
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -183,4 +185,52 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
   .btn-row { justify-content: flex-start; }
   .filters select, .filters .btn { flex: 1 1 45%; }
   .card { padding: 18px; }
+}
+
+/* ── WhatsApp automático ── */
+.wa-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; margin-bottom: 16px; }
+.wa-grid + .card, .card + .wa-grid { margin-top: 16px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.card-head h2 { margin: 0; }
+.pill { font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; white-space: nowrap; }
+.pill-connected { background: #dcfce7; color: #15803d; }
+.pill-qr, .pill-starting, .pill-reconnecting { background: #fef3c7; color: #92400e; }
+.pill-error { background: #fee2e2; color: #b91c1c; }
+.wa-number { font-size: 1.25rem; font-weight: 700; margin: 4px 0; }
+#wa-qr-box { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+#wa-qr { border: 1px solid var(--line); border-radius: 12px; padding: 8px; background: #fff; }
+.steps { margin: 0; padding-left: 18px; color: var(--text); font-size: 0.92rem; flex: 1 1 200px; }
+.steps li { margin-bottom: 8px; }
+.as-status { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 10px; background: #f8fafc; border: 1px solid var(--line); }
+.as-status .dot { width: 12px; height: 12px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+.as-status.st-pronto .dot, .as-status.st-aguardando .dot { background: var(--green); box-shadow: 0 0 0 4px #dcfce7; }
+.as-status.st-limite_hora .dot, .as-status.st-limite_dia .dot, .as-status.st-fora_horario .dot { background: #f59e0b; }
+.as-status.st-sem_conexao .dot, .as-status.st-sem_fila .dot { background: var(--red); }
+.meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0 8px; }
+.meter { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.meter small { display: block; color: var(--muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.meter strong { font-size: 1.25rem; }
+.meter .progress { margin: 6px 0 0; height: 6px; }
+.fixed-limits { font-size: 0.86rem; color: #334155; background: #eff6ff; border-radius: 10px; padding: 10px 12px; margin: 12px 0 0; }
+.table-wrap { overflow: auto; max-height: 560px; }
+.table-wrap thead th { position: sticky; top: 0; background: #fff; }
+table.log { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table.log th { text-align: left; color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.log td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+.badge.res-enviada { background: #dcfce7; color: #15803d; }
+.badge.res-sem_whatsapp { background: #f1f5f9; color: #64748b; }
+.badge.res-erro { background: #fee2e2; color: #b91c1c; }
+.reply { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.reply.optout { background: #fff7f7; }
+.reply-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+.reply-text { margin-bottom: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notice.small { font-size: 0.84rem; margin-top: 16px; }
+
+@media (max-width: 900px) {
+  .wa-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .meters { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .meter strong { font-size: 1.05rem; }
+  #wa-qr { width: 220px; height: 220px; }
 }

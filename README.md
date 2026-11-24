@@ -6,7 +6,8 @@ Site particular para encontrar e abordar potenciais clientes do CLINOVA: clínic
 - **Importar da Receita Federal**: lê os dados abertos oficiais de CNPJ e guarda só as empresas **ativas** das cidades e atividades (CNAE) escolhidas. Traz CNPJ, e-mail e telefones cadastrados.
 - **Junta os repetidos**: mesmo telefone, mesmo CNPJ ou mesma empresa no Google viram um contato só.
 - **Contatos**: fila de trabalho (celulares novos primeiro), status (Novo → Mensagem enviada → Respondeu → Vídeo enviado → Negociando → Virou cliente / Não quer contato), notas e exportação para planilha.
-- **WhatsApp**: o botão abre a conversa com a mensagem do segmento já escrita. **Você confere e envia**; nada é disparado automaticamente. Há um limite diário (padrão 25) para proteger seu número.
+- **WhatsApp manual**: o botão de cada contato abre a conversa com a mensagem do segmento já escrita; você confere e envia.
+- **WhatsApp automático** (conectado por QR Code): envia as mensagens de apresentação sozinho, com limites para proteger o número (detalhes abaixo).
 - **Acesso só seu**, com senha.
 
 ## Publicar no Railway (cerca de 10 minutos)
@@ -35,6 +36,30 @@ Site particular para encontrar e abordar potenciais clientes do CLINOVA: clínic
 
 Cada "consulta" ao Google traz até 20 empresas. O site não repete buscas feitas nos últimos 30 dias e para no limite que você escolher em cada rodada.
 
+## WhatsApp automático
+
+1. Aba **WhatsApp automático → Conectar WhatsApp**.
+2. No celular do número de prospecção: **⋮ Mais opções** (Android) ou **Configurações** (iPhone) → **Aparelhos conectados → Conectar um aparelho**, e leia o QR Code.
+3. Confira as **Regras do envio** (horário, dias, limite por dia, segmentos, cidades) e clique em **Ligar envio automático**.
+
+A sessão fica salva no volume `/data`: depois de ler o QR uma vez, o site reconecta sozinho quando reinicia.
+
+**Limites fixos (não dá para aumentar pela tela):**
+- no mínimo **1 minuto entre mensagens**, mais um intervalo aleatório de até 1 minuto (média de cerca de 1,5 min);
+- no máximo **30 mensagens por hora**;
+- limite por dia configurável, até 300 (padrão 150), e só no horário e nos dias escolhidos (padrão: seg. a sex., 9h às 18h, horário de Brasília).
+
+**Proteções automáticas:**
+- antes de enviar, confere se o número tem WhatsApp; se não tiver, o contato vira "Número inválido";
+- mostra "digitando..." por alguns segundos antes de cada mensagem;
+- `{saudacao}` vira Bom dia, Boa tarde ou Boa noite conforme a hora, e várias versões da mensagem (separadas por `---`) são sorteadas;
+- **quem responde sai da fila** e aparece em "Respostas recebidas" para você assumir a conversa;
+- **quem pede para parar** ("não tenho interesse", "pare", "me tire da lista"...) vira "Não quer contato" e nunca mais recebe;
+- 3 erros seguidos pausam o envio sozinho; desconectar o WhatsApp também pausa;
+- se o QR Code não for lido depois de algumas tentativas, ele para de gerar códigos novos até você clicar em Conectar.
+
+> ⚠️ **Use um número só para prospecção.** Envio automático de mensagens de prospecção por WhatsApp conectado via QR Code vai contra os termos de uso do WhatsApp. Os limites reduzem, mas não eliminam, o risco de bloqueio do número. Com um chip novo, comece com um limite diário baixo (ex.: 30–50) nas primeiras semanas.
+
 ## Boas práticas na abordagem (importante)
 
 - **Até 20–30 mensagens novas por dia.** Muitas mensagens iguais para quem não tem seu número salvo podem fazer o WhatsApp **bloquear seu número**.
@@ -60,7 +85,7 @@ Abra <http://localhost:3000>.
 npm test
 ```
 
-Os testes usam versões **simuladas** do Google e da Receita: não precisam de internet e não gastam cota.
+Os testes usam versões **simuladas** do Google, da Receita e do WhatsApp (com o tempo acelerado 600×): não precisam de internet, não gastam cota e não enviam mensagens de verdade.
 
 ## Variáveis opcionais
 
