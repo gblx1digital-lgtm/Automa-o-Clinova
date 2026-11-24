@@ -93,5 +93,5 @@ Os testes usam versões **simuladas** do Google, da Receita e do WhatsApp (com o
 |---|---|
 | `DATA_DIR` | Pasta dos dados (no Docker já é `/data`). |
 | `SESSION_SECRET` | Segredo das sessões. Sem ele, o segredo é derivado da senha, e trocar a senha desconecta todo mundo. |
-| `RECEITA_BASE_URL` | Endereço dos dados abertos de CNPJ, caso a Receita mude o local dos arquivos. |
+| `RECEITA_SHARE_URL` | Endereço do compartilhamento de dados abertos de CNPJ da Receita, caso ela mude o local dos arquivos. Padrão: `https://arquivos.receitafederal.gov.br/public.php/dav/files/YggdBLfdninEJX9/`. O site procura sozinho a pasta do mês mais recente (AAAA-MM). |
 | `RECEITA_MES` | Força um mês específico dos dados da Receita (`AAAA-MM`). |
