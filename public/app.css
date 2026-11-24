@@ -234,3 +234,9 @@ table.log td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: t
   .meter strong { font-size: 1.05rem; }
   #wa-qr { width: 220px; height: 220px; }
 }
+
+/* ── Estado inteiro ── */
+.state-box { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; }
+.state-box label { display: flex; flex-direction: column; gap: 4px; }
+.estimate { margin: 8px 0 0; font-size: 0.88rem; color: #1e3a8a; background: #eff6ff; border-radius: 8px; padding: 8px 10px; }
+.estimate:empty { display: none; }

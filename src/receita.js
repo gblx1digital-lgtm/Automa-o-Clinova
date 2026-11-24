@@ -17,6 +17,7 @@ const unzipper = require('unzipper');
 const storage = require('./storage');
 const leads = require('./leads');
 const { BY_ID, BY_CNAE } = require('./segments');
+const citiesLib = require('./cities');
 
 const DEFAULT_SHARE = 'https://arquivos.receitafederal.gov.br/public.php/dav/files/YggdBLfdninEJX9/';
 const ROOT = () => String(process.env.RECEITA_SHARE_URL || process.env.RECEITA_BASE_URL || DEFAULT_SHARE).replace(/\/?$/, '/');
@@ -182,9 +183,13 @@ function cleanCompanyName(razao) {
 function start(opts = {}) {
   if (job.running) throw Object.assign(new Error('Já existe uma importação em andamento.'), { status: 409 });
   const uf = norm(opts.uf || 'MG').slice(0, 2);
-  const cities = (opts.cities || []).map(norm).filter(Boolean);
+  // Lista vazia (ou só o estado, ex.: "MG") = estado inteiro
+  let cities = (opts.cities || []).map(norm).filter(Boolean);
+  if (cities.some(c => citiesLib.ufFromText(c))) cities = [];
+  const wholeState = cities.length === 0;
   const segs = (opts.segments || []).filter(s => BY_ID[s]);
-  if (!cities.length || !segs.length) throw Object.assign(new Error('Escolha ao menos uma cidade e um segmento.'), { status: 400 });
+  if (!segs.length) throw Object.assign(new Error('Escolha ao menos um segmento.'), { status: 400 });
+  if (wholeState && !citiesLib.STATE_NAMES[uf]) throw Object.assign(new Error('Informe a UF (ex.: MG).'), { status: 400 });
   const cnaes = new Set(segs.flatMap(s => BY_ID[s].cnaes));
   const withNames = opts.withNames !== false;
 
@@ -203,7 +208,7 @@ function start(opts = {}) {
     job.step = 'Lendo a lista de municípios'; job.file = 'Municipios.zip';
     const codeToCity = new Map();
     await eachLine(share.municipios.url, f => {
-      if (cities.includes(norm(f[1]))) codeToCity.set(f[0], leads.titleCase(f[1]));
+      if (wholeState || cities.includes(norm(f[1]))) codeToCity.set(f[0], leads.titleCase(f[1]));
     });
     job.filesDone++;
     if (!codeToCity.size) throw new Error(`Nenhuma das cidades foi encontrada na lista da Receita: ${cities.join(', ')}.`);

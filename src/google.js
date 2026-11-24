@@ -8,6 +8,7 @@
 const storage = require('./storage');
 const leads = require('./leads');
 const { BY_ID } = require('./segments');
+const cities = require('./cities');
 
 const PLACES_URL = () => (process.env.PLACES_API_URL || 'https://places.googleapis.com/v1/places:searchText').trim();
 const FIELD_MASK = [
@@ -66,10 +67,11 @@ function log() { return storage.read('google-log', {}); }
  * Roda as buscas (termo do segmento × área) até o limite de chamadas.
  * Pode ser chamada de novo para continuar de onde parou.
  */
-async function run({ segments = [], areas = [], maxCalls = 40, redo = false }) {
+async function run({ segments = [], areas = [], maxCalls = 40, redo = false, minPopulation = 20000 }) {
   if (!isConfigured()) throw Object.assign(new Error('Defina GOOGLE_PLACES_API_KEY nas variáveis do servidor.'), { status: 400 });
   const segs = segments.filter(s => BY_ID[s]);
-  const areaList = areas.map(a => String(a || '').trim()).filter(Boolean).slice(0, 200);
+  // Uma linha só com o estado ("MG", "Minas Gerais") vira a lista das cidades do estado
+  const areaList = cities.expandAreas(areas.map(a => String(a || '').trim()).filter(Boolean), Number(minPopulation) || 0).slice(0, 6000);
   if (!segs.length || !areaList.length) throw Object.assign(new Error('Escolha ao menos um segmento e uma área.'), { status: 400 });
   maxCalls = Math.min(Math.max(Number(maxCalls) || 40, 1), 200);
 

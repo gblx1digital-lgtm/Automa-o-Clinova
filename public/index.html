@@ -146,8 +146,26 @@
         </div>
         <h3>Segmentos</h3>
         <div class="chips" id="g-segments"></div>
-        <h3>Bairros e cidades <small class="muted">(um por linha)</small></h3>
+        <h3>Onde buscar</h3>
+        <div class="state-box">
+          <label>Estado inteiro
+            <select id="g-uf"></select>
+          </label>
+          <label>Cidades com pelo menos
+            <select id="g-minpop">
+              <option value="100000">100 mil habitantes</option>
+              <option value="50000" selected>50 mil habitantes</option>
+              <option value="20000">20 mil habitantes</option>
+              <option value="10000">10 mil habitantes</option>
+              <option value="0">Todas as cidades</option>
+            </select>
+          </label>
+          <button class="btn btn-ghost" id="btn-fill-state">Preencher com as cidades do estado</button>
+        </div>
+        <p class="muted small">Cada busca no Google traz no máximo 60 empresas, por isso o estado é buscado cidade por cidade. Em cidades muito grandes (como BH), para pegar mais empresas, acrescente também bairros.</p>
+        <h3>Bairros e cidades <small class="muted">(um por linha; pode escrever só a sigla do estado, ex.: MG)</small></h3>
         <textarea id="g-areas" rows="8"></textarea>
+        <p class="estimate" id="g-estimate"></p>
         <div class="row">
           <label>Máximo de consultas nesta rodada
             <input type="number" id="g-max" value="40" min="1" max="200">
@@ -171,7 +189,7 @@
           <label>UF <input type="text" id="r-uf" maxlength="2" value="MG"></label>
           <label class="check"><input type="checkbox" id="r-names" checked> Buscar a razão social de quem não tem nome fantasia (mais lento)</label>
         </div>
-        <h3>Cidades <small class="muted">(um por linha, como na Receita: sem acentos não tem problema)</small></h3>
+        <h3>Cidades <small class="muted">(uma por linha; sem acentos não tem problema; <strong>deixe vazio para importar o estado inteiro</strong>)</small></h3>
         <textarea id="r-cities" rows="6"></textarea>
         <h3>Segmentos</h3>
         <div class="chips" id="r-segments"></div>
