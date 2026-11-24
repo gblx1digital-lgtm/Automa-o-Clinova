@@ -17,6 +17,7 @@ const check = (name, cond, extra = '') => { cond ? pass++ : fail++; console.log(
 
 // ─── Google Places simulado ──────────────────────────────────────────────────
 let placesCalls = 0;
+const placesQueries = [];
 function place(id, name, phone, extra = {}) {
   return {
     id, displayName: { text: name }, nationalPhoneNumber: phone, formattedAddress: `Rua ${name}, 10 - Savassi, Belo Horizonte - MG`,
@@ -38,6 +39,7 @@ const placesServer = http.createServer((req, res) => {
       return res.end(JSON.stringify({ error: { message: 'API key inválida' } }));
     }
     const q = JSON.parse(body);
+    placesQueries.push(q.textQuery);
     let places = [], next = null;
     if (q.textQuery.startsWith('dentista em Savassi')) {
       if (!q.pageToken) {
@@ -226,6 +228,22 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('Filtros por fonte e cidade', r.json.total === 1 && r.json.items[0].name === 'Maria Souza', r.json.total);
     r = await call('GET', '/api/leads?q=11111111');
     check('Busca por CNPJ', r.json.total === 1, r.json.total);
+
+    // Estado inteiro
+    r = await call('GET', '/api/cities?uf=MG&min=50000');
+    check('Cidades de MG com 50 mil+ (IBGE 2022): 72, BH primeiro', r.json.total === 72 && r.json.cities[0].name === 'Belo Horizonte' && r.json.cities[0].pop === 2315560, JSON.stringify(r.json).slice(0, 120));
+    r = await call('GET', '/api/config');
+    check('Lista dos 27 estados na tela', r.json.states.length === 27 && r.json.states.find(x => x.uf === 'MG').cities === 853);
+    placesQueries.length = 0;
+    r = await call('POST', '/api/google/search', { segments: ['psicologia'], areas: ['MG'], minPopulation: 500000, maxCalls: 50 });
+    const expected = ['Belo Horizonte', 'Uberlândia', 'Contagem', 'Juiz de Fora'].flatMap(c => [`psicólogo em ${c}, MG`, `clínica de psicologia em ${c}, MG`]);
+    check('Google: "MG" vira as cidades do estado (500 mil+)', expected.every(q => placesQueries.includes(q)) && placesQueries.length === 8, JSON.stringify(placesQueries));
+    placesQueries.length = 0;
+    r = await call('POST', '/api/google/search', { segments: ['nutricao'], areas: ['São Paulo'], maxCalls: 5 });
+    check('Google: "São Paulo" sozinho é a cidade, não o estado', placesQueries.length === 1 && placesQueries[0] === 'nutricionista em São Paulo', JSON.stringify(placesQueries));
+    r = await call('POST', '/api/receita/import', { uf: 'MG', cities: [], segments: ['odontologia', 'petshop', 'psicologia'], withNames: false });
+    for (let i = 0; i < 100; i++) { st = (await call('GET', '/api/receita/status')).json; if (!st.running) break; await sleep(100); }
+    check('Receita: cidades vazias = estado inteiro', st.step === 'Concluído' && st.matched === 3 && !st.error, JSON.stringify(st));
 
     // Planilha
     r = await call('GET', '/api/leads.csv');

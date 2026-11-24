@@ -13,6 +13,7 @@ const google = require('./src/google');
 const receita = require('./src/receita');
 const whatsapp = require('./src/whatsapp');
 const autosend = require('./src/autosend');
+const cities = require('./src/cities');
 const { SEGMENTS, DEFAULT_TEMPLATES, DEFAULT_AREAS, DEFAULT_CITIES } = require('./src/segments');
 
 const app = express();
@@ -76,6 +77,7 @@ app.get('/api/config', (req, res) => {
     segments: SEGMENTS.map(({ id, label, group, terms }) => ({ id, label, group, terms })),
     statuses: leads.STATUSES,
     settings: settings(),
+    states: cities.states(),
     googleConfigured: google.isConfigured()
   });
 });
@@ -95,6 +97,14 @@ app.put('/api/settings', (req, res) => {
   if (b.uf !== undefined) cur.uf = String(b.uf).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'MG';
   storage.save('settings');
   res.json(settings());
+});
+
+// ─── Cidades por estado (IBGE, Censo 2022) ────────────────────────────────────
+app.get('/api/cities', (req, res) => {
+  const uf = cities.ufFromText(req.query.uf || '');
+  if (!uf) return res.status(400).json({ error: 'Estado não encontrado.' });
+  const list = cities.citiesOf(uf, Number(req.query.min) || 0);
+  res.json({ uf, name: cities.STATE_NAMES[uf], total: list.length, cities: list });
 });
 
 // ─── Contatos ─────────────────────────────────────────────────────────────────

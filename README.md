@@ -25,6 +25,15 @@ Site particular para encontrar e abordar potenciais clientes do CLINOVA: clínic
 4. Em **Settings → Networking → Generate Domain**, gere um endereço, por exemplo `clinova-prospeccao.up.railway.app`. Se quiser, use um subdomínio seu, como `prospeccao.useclinova.com`.
 5. Abra o endereço, entre com a senha e comece.
 
+## Buscar em um estado inteiro
+
+- **Google**: em "Onde buscar", escolha o estado e o tamanho mínimo das cidades (100 mil, 50 mil, 20 mil, 10 mil habitantes ou todas) e clique em **Preencher com as cidades do estado**. Também dá para escrever só a sigla (`MG`) ou "estado de Minas Gerais" numa linha. A tela mostra quantas buscas isso vai gerar antes de você clicar em Buscar.
+  - "São Paulo", "Rio de Janeiro", "Goiás" e "Tocantins" sozinhos são tratados como **cidades**; para o estado, use a sigla (`SP`) ou "estado de São Paulo".
+  - Cada busca do Google traz no máximo 60 empresas: em cidades muito grandes, acrescente bairros para pegar mais.
+- **Receita Federal**: deixe a lista de cidades **vazia** (ou escreva só a sigla) para importar o estado inteiro da UF escolhida.
+
+População por município: IBGE, Censo 2022 (dados do pacote `municipios-br`, licença MIT; veja `src/data/LICENSE-municipios-br.txt`).
+
 ## Criar a chave do Google (Places API)
 
 1. Acesse <https://console.cloud.google.com/>, crie um projeto (ex.: "Clinova Prospecção") e **ative o faturamento**. O Google exige cartão, mas tem uma cota gratuita mensal. Confira os preços atuais da *Places API (New) — Text Search* na página de preços do Google Maps Platform.

@@ -204,6 +204,52 @@ function chips(containerId, name) {
 }
 const checked = (name) => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
 
+// Estado inteiro: preenche a lista com as cidades do estado (IBGE, Censo 2022)
+const stateCount = {}; // "MG|50000" -> número de cidades
+async function citiesCount(uf, min) {
+  const key = `${uf}|${min}`;
+  if (stateCount[key] === undefined) {
+    const r = await api(`/api/cities?uf=${encodeURIComponent(uf)}&min=${min}`);
+    stateCount[key] = r.total;
+  }
+  return stateCount[key];
+}
+const isStateLine = (line) => /^[A-Za-z]{2}$/.test(line.trim()) || /^(todo (o )?)?(o )?estado /i.test(line.trim());
+
+async function updateEstimate() {
+  const lines = $('g-areas').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const segs = checked('g-seg');
+  const terms = state.config.segments.filter(s => segs.includes(s.id)).reduce((n, s) => n + s.terms.length, 0);
+  let areas = 0;
+  try {
+    for (const line of lines) {
+      if (isStateLine(line)) {
+        const uf = line.trim().length === 2 ? line.trim().toUpperCase() : line;
+        areas += await citiesCount(uf, $('g-minpop').value).catch(() => 1);
+      } else areas++;
+    }
+  } catch (e) { /* estimativa é só informativa */ }
+  $('g-estimate').textContent = terms && areas
+    ? `${areas.toLocaleString('pt-BR')} lugares × ${terms} termos de busca = cerca de ${(areas * terms).toLocaleString('pt-BR')} buscas (cada uma usa 1 a 3 consultas do Google). Buscas já feitas nos últimos 30 dias não contam de novo.`
+    : '';
+}
+let estTimer = null;
+const scheduleEstimate = () => { clearTimeout(estTimer); estTimer = setTimeout(updateEstimate, 300); };
+$('g-areas').addEventListener('input', scheduleEstimate);
+$('g-minpop').addEventListener('change', scheduleEstimate);
+$('g-segments').addEventListener('change', scheduleEstimate);
+
+$('btn-fill-state').addEventListener('click', async () => {
+  const uf = $('g-uf').value;
+  if (!uf) return toast('Escolha o estado.', 'err');
+  try {
+    const r = await api(`/api/cities?uf=${uf}&min=${$('g-minpop').value}`);
+    $('g-areas').value = r.cities.map(c => `${c.name}, ${r.uf}`).join('\n');
+    toast(`${r.total} cidades de ${r.name} na lista.`);
+    updateEstimate();
+  } catch (err) { toast(err.message, 'err'); }
+});
+
 $('btn-google').addEventListener('click', async () => {
   const segments = checked('g-seg');
   const areas = $('g-areas').value.split('\n').map(s => s.trim()).filter(Boolean);
@@ -212,7 +258,7 @@ $('btn-google').addEventListener('click', async () => {
   btn.disabled = true; btn.textContent = 'Buscando... (pode levar alguns minutos)';
   const out = $('g-result');
   try {
-    const r = await api('/api/google/search', { method: 'POST', body: { segments, areas, maxCalls: Number($('g-max').value) || 40 } });
+    const r = await api('/api/google/search', { method: 'POST', body: { segments, areas, maxCalls: Number($('g-max').value) || 40, minPopulation: Number($('g-minpop').value) } });
     out.hidden = false;
     out.innerHTML = `
       <strong>${r.added} contatos novos</strong> · ${r.merged} já existiam (dados completados) · ${r.skipped} sem telefone · ${r.closed} fechados<br>
@@ -441,6 +487,8 @@ $('btn-save-msgs').addEventListener('click', async () => {
     chips('g-segments', 'g-seg');
     chips('r-segments', 'r-seg');
     $('g-areas').value = c.settings.areas.join('\n');
+    $('g-uf').innerHTML = '<option value="">Escolha...</option>' + c.states.map(st => `<option value="${esc(st.uf)}"${st.uf === 'MG' ? ' selected' : ''}>${esc(st.name)} (${esc(st.uf)})</option>`).join('');
+    updateEstimate();
     $('r-cities').value = c.settings.cities.join('\n');
     $('r-uf').value = c.settings.uf;
     $('google-off').hidden = c.googleConfigured;
