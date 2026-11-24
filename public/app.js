@@ -48,7 +48,7 @@ function filters() {
   return {
     q: $('f-q').value.trim(), segment: $('f-segment').value, city: $('f-city').value,
     status: $('f-status').value, source: $('f-source').value, mobile: $('f-mobile').checked ? '1' : '',
-    site: $('f-site').value, priority: $('f-priority').value
+    site: $('f-site').value, priority: $('f-priority').value, state: $('f-state').value
   };
 }
 
@@ -63,6 +63,7 @@ async function loadLeads() {
   state.data = data;
   renderKpis(data.stats);
   renderCities(data.stats.cities);
+  renderStates(data.stats.byState || {});
   renderList(data);
 }
 
@@ -81,6 +82,14 @@ function renderKpis(s) {
   $('daily-hint').textContent = over
     ? `Você já enviou ${s.contactedToday} mensagens hoje (limite ${limit}). Para proteger seu número, continue amanhã.`
     : '';
+}
+
+function renderStates(byState) {
+  const sel = $('f-state');
+  const cur = sel.value;
+  const ufs = Object.keys(byState).sort();
+  sel.innerHTML = '<option value="">Todos os estados</option>' +
+    ufs.map(uf => `<option value="${esc(uf)}"${uf === cur ? ' selected' : ''}>${esc(uf)} (${esc(byState[uf])})</option>`).join('');
 }
 
 function renderCities(cities) {
@@ -200,7 +209,7 @@ $('pager').addEventListener('click', (e) => {
 });
 
 let qTimer = null;
-['f-segment', 'f-city', 'f-status', 'f-source', 'f-mobile', 'f-site', 'f-priority'].forEach(id => $(id).addEventListener('change', () => { state.page = 1; loadLeads().catch(err => toast(err.message, 'err')); }));
+['f-segment', 'f-state', 'f-city', 'f-status', 'f-source', 'f-mobile', 'f-site', 'f-priority'].forEach(id => $(id).addEventListener('change', () => { state.page = 1; loadLeads().catch(err => toast(err.message, 'err')); }));
 $('f-q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.page = 1; loadLeads().catch(err => toast(err.message, 'err')); }, 300); });
 
 // ─── Google ──────────────────────────────────────────────────────────────────
@@ -391,6 +400,13 @@ function renderAutosendForm(cfg) {
   $('as-unverified').checked = cfg.includeUnverified !== false;
   $('as-cities').value = (cfg.cities || []).join('\n');
   $('as-days').innerHTML = DAY_LABEL.map((d, i) => `<label class="chip"><input type="checkbox" name="as-day" value="${i}"${cfg.days.includes(i) ? ' checked' : ''}> ${d}</label>`).join('');
+  // Estados: os que têm contatos (com a quantidade) + os já escolhidos
+  const avail = state.as?.statesAvailable || {};
+  const ufs = [...new Set([...Object.keys(avail), ...(cfg.states || [])])].sort();
+  const nameOf = (uf) => (state.config.states || []).find(s => s.uf === uf)?.name || uf;
+  $('as-states').innerHTML = ufs.length
+    ? ufs.map(uf => `<label class="chip"><input type="checkbox" name="as-state" value="${esc(uf)}"${(cfg.states || []).includes(uf) ? ' checked' : ''}> ${esc(nameOf(uf))} <span class="muted">· ${esc(avail[uf] || 0)}</span></label>`).join('')
+    : '<p class="muted small">Os estados aparecem aqui quando você tiver contatos.</p>';
   $('as-segments').innerHTML = state.config.segments.map(sg => `<label class="chip"><input type="checkbox" name="as-seg" value="${esc(sg.id)}"${cfg.segments.includes(sg.id) ? ' checked' : ''}> ${esc(sg.label)}</label>`).join('');
 }
 
@@ -425,7 +441,7 @@ async function loadAutosend() {
 }
 
 ['as-daily', 'as-start', 'as-end', 'as-source', 'as-cities'].forEach(id => $(id).addEventListener('input', () => { state.asFormDirty = true; }));
-['as-days', 'as-segments'].forEach(id => $(id).addEventListener('change', () => { state.asFormDirty = true; }));
+['as-days', 'as-states', 'as-segments'].forEach(id => $(id).addEventListener('change', () => { state.asFormDirty = true; }));
 
 $('btn-wa-connect').addEventListener('click', async () => {
   try { renderWhatsapp(await api('/api/whatsapp/connect', { method: 'POST', body: {} })); loadAutosend(); } catch (err) { toast(err.message, 'err'); }
@@ -451,7 +467,7 @@ $('btn-as-save').addEventListener('click', async () => {
     const data = await api('/api/autosend', { method: 'PUT', body: {
       dailyLimit: Number($('as-daily').value), start: $('as-start').value, end: $('as-end').value, source: $('as-source').value,
       onlyWithoutSite: $('as-nosite').checked, includeUnverified: $('as-unverified').checked,
-      days: checked('as-day').map(Number), segments: checked('as-seg'),
+      days: checked('as-day').map(Number), segments: checked('as-seg'), states: checked('as-state'),
       cities: $('as-cities').value.split('\n').map(c => c.trim()).filter(Boolean)
     } });
     state.asFormDirty = false;

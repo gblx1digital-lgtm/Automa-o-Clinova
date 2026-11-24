@@ -35,6 +35,7 @@ const DEFAULTS = {
   days: [1, 2, 3, 4, 5], // 0 = domingo ... 6 = sábado
   segments: [],
   cities: [],
+  states: [],    // siglas dos estados (vazio = todos)
   source: '',
   onlyWithoutSite: true,   // só quem não tem site próprio (sem site ou só rede social)
   includeUnverified: true  // inclui quem veio só da Receita (site não verificado)
@@ -65,6 +66,10 @@ function saveConfig(changes = {}) {
   if (Array.isArray(changes.days)) cur.days = [...new Set(changes.days.map(Number).filter(d => d >= 0 && d <= 6))];
   if (Array.isArray(changes.segments)) cur.segments = changes.segments.filter(id => BY_ID[id]);
   if (Array.isArray(changes.cities)) cur.cities = changes.cities.map(c => String(c).trim()).filter(Boolean).slice(0, 100);
+  if (Array.isArray(changes.states)) {
+    const { STATE_NAMES } = require('./cities');
+    cur.states = [...new Set(changes.states.map(s => String(s).toUpperCase()).filter(s => STATE_NAMES[s]))];
+  }
   if (changes.source !== undefined) cur.source = ['google', 'receita'].includes(changes.source) ? changes.source : '';
   if (changes.onlyWithoutSite !== undefined) cur.onlyWithoutSite = Boolean(changes.onlyWithoutSite);
   if (changes.includeUnverified !== undefined) cur.includeUnverified = Boolean(changes.includeUnverified);
@@ -119,6 +124,7 @@ function queue(cfg = config()) {
     .filter(l => l.status === 'novo' && l.mobile && !l.contactedAt &&
       (!cfg.segments.length || cfg.segments.includes(l.segment)) &&
       (!cities.length || cities.includes(norm(l.city))) &&
+      (!(cfg.states || []).length || cfg.states.includes(leads.leadUF(l))) &&
       (!cfg.source || (l.sources || []).includes(cfg.source)) &&
       siteOk(l))
     .map(l => ({ l, s: intel.score(l).score }))

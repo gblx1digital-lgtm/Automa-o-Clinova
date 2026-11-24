@@ -215,6 +215,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     check('Lista ordenada pela prioridade', r.json.items[0].name === 'Nutri Sem Site' && r.json.items[r.json.items.length - 1].name === 'Nutri Doctoralia', r.json.items.map(i => i.name).join(', '));
     r = await call('GET', '/api/leads?priority=alta&pageSize=200');
     check('Filtro por prioridade', r.json.items.every(l => l.intel.level === 'alta'));
+    r = await call('GET', '/api/leads?state=MG&pageSize=10');
+    check('Filtro por estado (MG) e contagem por estado', r.json.total === r.json.stats.total && r.json.stats.byState.MG === r.json.stats.total, `${r.json.total} ${JSON.stringify(r.json.stats.byState)}`);
+    r = await call('GET', '/api/leads?state=SC');
+    check('Filtro por estado sem contatos', r.json.total === 0);
     check('Indicadores: "sem site próprio" e prioridade', typeof r.json.stats.noSite === 'number' && r.json.stats.bySite.agendamento === 1 && r.json.stats.byPriority.alta > 0, JSON.stringify(r.json.stats.bySite));
 
     // Andamento
